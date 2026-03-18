@@ -35,13 +35,15 @@ const CartWidget = (() => {
   const bindEvents = () => {
     document.getElementById('cartClose')?.addEventListener('click', close);
     document.getElementById('cartOverlay')?.addEventListener('click', close);
-    document.addEventListener('click', e => {
+    document.addEventListener('click', async e => {
       if (e.target.closest('[data-open-cart]')) open();
       if (e.target.closest('[data-add-cart]')) {
         const btn = e.target.closest('[data-add-cart]');
         const id = btn.dataset.addCart;
-        const product = DB.products.get(id);
-        if (product) { DB.cart.add(product); open(); showAddedFeedback(btn); }
+        try {
+          const product = await DB.products.get(id);
+          if (product) { DB.cart.add(product); open(); showAddedFeedback(btn); }
+        } catch(err) { console.error('add to cart', err); }
       }
     });
   };
@@ -54,7 +56,7 @@ const CartWidget = (() => {
     setTimeout(() => { btn.textContent = orig; btn.style.background = ''; btn.style.color = ''; }, 1500);
   };
 
-  const render = items => {
+  const render = async items => {
     updateNavBadge();
     const body   = document.getElementById('cartBody');
     const footer = document.getElementById('cartFooter');
@@ -91,7 +93,8 @@ const CartWidget = (() => {
       </div>
     `).join('');
 
-    const deliverySettings = DB.settings.get();
+    let deliverySettings = { freeFrom: 3000, deliveryPrice: 500 };
+    try { const s = await DB.settings.get(); deliverySettings = { freeFrom: parseInt(s.free_from||s.freeFrom)||3000, deliveryPrice: parseInt(s.delivery_price||s.deliveryPrice)||500 }; } catch(e) {}
     const total    = DB.cart.total();
     const delivery = total >= deliverySettings.freeFrom ? 0 : deliverySettings.deliveryPrice;
     const grand    = total + delivery;

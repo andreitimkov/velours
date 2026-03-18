@@ -384,12 +384,13 @@ function oM(id){$(id).classList.add('open')} function cM(id){$(id).classList.rem
 const SL={new:'Новый',confirmed:'Подтверждён',delivery:'В доставке',done:'Выполнен',cancelled:'Отменён'};
 let ch={},curOID=null,imgD=null,galImgs=[],editPID=null,catCh=null,ach={};
 
-$('lBtn').onclick=()=>{
-  const u=DB.users.findByEmail($('lEmail').value.trim());
-  const p=$('lPass').value;
-  if(u&&u.role==='admin'&&(u.passwordHash===p||u.passwordHash===btoa(encodeURIComponent(p)))){
-    DB.session.set(u);$('LS').style.display='none';init();
-  }else{$('lErr').textContent='Неверный логин или пароль';$('lErr').classList.add('show')}
+$('lBtn').onclick=async()=>{
+  $('lBtn').disabled=true;$('lErr').classList.remove('show');
+  try{
+    const user=await Auth.login({email:$('lEmail').value.trim(),password:$('lPass').value});
+    if(user.role!=='admin'){$('lErr').textContent='Нет прав администратора';$('lErr').classList.add('show');DB.session.clear();$('lBtn').disabled=false;return}
+    $('LS').style.display='none';init();
+  }catch(e){$('lErr').textContent=e.message||'Неверный логин или пароль';$('lErr').classList.add('show');$('lBtn').disabled=false}
 };
 $('lEmail').onkeydown=e=>{if(e.key==='Enter')$('lPass').focus()};
 $('lPass').onkeydown=e=>{if(e.key==='Enter')$('lBtn').click()};
@@ -406,72 +407,80 @@ function gP(n){
 window.gP=gP;
 document.querySelectorAll('.ni[data-p]').forEach(b=>b.addEventListener('click',()=>gP(b.dataset.p)));
 function init(){updBadge();gP('dashboard')}
-function updBadge(){const c=DB.orders.getAll({status:'new'}).length;$('nob').textContent=c;$('nob').style.display=c>0?'':'none'}
+async function updBadge(){try{const list=await DB.orders.getAll({status:'new'});const c=list.length;$('nob').textContent=c;$('nob').style.display=c>0?'':'none'}catch(e){}}
 
 // DASHBOARD
-function rD(){
-  const orders=DB.orders.getAll(),paid=orders.filter(o=>o.paymentStatus==='paid');
-  const rev=paid.reduce((s,o)=>s+o.total,0),stats=DB.orders.stats();
+async function rD(){
+  try{
+  const orders=await DB.orders.getAll(),paid=orders.filter(o=>o.paymentStatus==='paid');
+  const rev=paid.reduce((s,o)=>s+o.total,0),stats=await DB.orders.stats();
   const today=orders.filter(o=>new Date(o.createdAt).toDateString()===new Date().toDateString());
-  $('dStats').innerHTML=`<div class="sc sc--gld"><div class="sc-lbl">Выручка</div><div class="sc-val">${(rev/1000).toFixed(1)}<span style="font-size:.9rem">к ₽</span></div><div class="sc-sub">${paid.length} оплаченных</div></div><div class="sc"><div class="sc-lbl">Сегодня</div><div class="sc-val">${today.length}</div><div class="sc-sub">заказов</div></div><div class="sc"><div class="sc-lbl">Новых</div><div class="sc-val" style="color:var(--wrn)">${stats.byStatus.new||0}</div><div class="sc-sub up">Требуют обработки</div></div><div class="sc"><div class="sc-lbl">Клиентов</div><div class="sc-val">${DB.users.getAll().filter(u=>u.role!=='admin').length}</div></div>`;
+  const users=await DB.users.getAll();
+  $('dStats').innerHTML=`<div class="sc sc--gld"><div class="sc-lbl">Выручка</div><div class="sc-val">${(rev/1000).toFixed(1)}<span style="font-size:.9rem">к ₽</span></div><div class="sc-sub">${paid.length} оплаченных</div></div><div class="sc"><div class="sc-lbl">Сегодня</div><div class="sc-val">${today.length}</div><div class="sc-sub">заказов</div></div><div class="sc"><div class="sc-lbl">Новых</div><div class="sc-val" style="color:var(--wrn)">${stats.byStatus?.new||0}</div><div class="sc-sub up">Требуют обработки</div></div><div class="sc"><div class="sc-lbl">Клиентов</div><div class="sc-val">${users.filter(u=>u.role!=='admin').length}</div></div>`;
   const days=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d});
   const rData=days.map(d=>paid.filter(o=>new Date(o.createdAt).toDateString()===d.toDateString()).reduce((s,o)=>s+o.total,0));
   ch.rev?.destroy();ch.rev=new Chart($('cRev'),{type:'line',data:{labels:days.map(d=>d.toLocaleDateString('ru',{weekday:'short'})),datasets:[{data:rData,borderColor:'#c9a96e',backgroundColor:'rgba(201,169,110,.1)',tension:.4,fill:true,pointBackgroundColor:'#c9a96e',pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8a9a8a',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8a9a8a',font:{size:10},callback:v=>(v/1000).toFixed(0)+'к'}}}}});
-  const sd=[stats.byStatus.new||0,stats.byStatus.confirmed||0,stats.byStatus.delivery||0,stats.byStatus.done||0];
+  const sd=[stats.byStatus?.new||0,stats.byStatus?.confirmed||0,stats.byStatus?.delivery||0,stats.byStatus?.done||0];
   ch.st?.destroy();ch.st=new Chart($('cStat'),{type:'doughnut',data:{labels:['Новые','Подтверж.','Доставка','Выполнены'],datasets:[{data:sd,backgroundColor:['#e09040','#5590e0','#c9a96e','#4aaa6a'],borderColor:'#1a2e1a',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8a9a8a',font:{size:10},padding:10}}}}});
   document.querySelector('#dOT tbody').innerHTML=orders.slice(0,7).map(o=>`<tr><td><span style="color:var(--gld);font-family:var(--fd)">${o.id}</span></td><td>${o.customerName}</td><td style="color:var(--mut);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(o.items||[]).map(i=>i.name).join(', ')}</td><td style="font-family:var(--fd)">${fmt(o.total)}</td><td><span class="b b-${o.status}">${SL[o.status]}</span></td><td style="color:var(--mut)">${fmtDT(o.createdAt)}</td></tr>`).join('');
+  }catch(e){console.error('rD',e)}
 }
 
 // ORDERS
-function rO(){
+async function rO(){
+  try{
   const s=$('oSrch').value.trim(),st=$('oSt').value,py=$('oPay').value;
-  let list=DB.orders.getAll({search:s,status:st});if(py)list=list.filter(o=>o.paymentStatus===py);
+  let list=await DB.orders.getAll({search:s,status:st});if(py)list=list.filter(o=>o.paymentStatus===py);
   $('oCnt').textContent=list.length+' заказов';
   document.querySelector('#oT tbody').innerHTML=list.length?list.map(o=>`<tr><td><a href="#" onclick="openO('${o.id}');return false" style="color:var(--gld);font-family:var(--fd)">${o.id}</a></td><td><div style="font-size:.82rem;color:var(--crm)">${o.customerName}</div><div style="font-size:.7rem;color:var(--mut)">${o.phone||''}</div></td><td style="font-size:.75rem;color:var(--mut);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.address||'—'}</td><td style="font-size:.75rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(o.items||[]).map(i=>i.name).join(', ')}</td><td style="font-family:var(--fd)">${fmt(o.total)}</td><td><span class="b b-${o.paymentStatus}">${o.paymentStatus==='paid'?'Оплачен':'Ожидает'}</span></td><td><select class="fsel" style="padding:4px 7px;font-size:.7rem" onchange="chOS('${o.id}',this.value)">${['new','confirmed','delivery','done','cancelled'].map(s=>`<option value="${s}"${o.status===s?' selected':''}>${SL[s]}</option>`).join('')}</select></td><td style="color:var(--mut);font-size:.75rem;white-space:nowrap">${fmtDT(o.createdAt)}</td><td><div style="display:flex;gap:4px"><button class="btn bg bic bsm" onclick="openO('${o.id}')" title="Открыть">↗</button><button class="btn bd bic bsm" onclick="delO('${o.id}')" title="Удалить">✕</button></div></td></tr>`).join(''):`<tr><td colspan="9"><div class="es"><div class="es-ic">📦</div><h4>Нет заказов</h4></div></td></tr>`;
+  }catch(e){console.error('rO',e)}
 }
 $('oSrch').oninput=rO;$('oSt').onchange=rO;$('oPay').onchange=rO;
-window.chOS=(id,st)=>{DB.orders.update(id,{status:st});updBadge();tst('Статус изменён')};
-window.delO=id=>{if(confirm('Удалить заказ?')){DB.orders.delete(id);rO();updBadge();tst('Удалено','w')}};
-window.openO=id=>{
-  curOID=id;const o=DB.orders.get(id);if(!o)return;
+window.chOS=async(id,st)=>{await DB.orders.update(id,{status:st});updBadge();tst('Статус изменён')};
+window.delO=async id=>{if(confirm('Удалить заказ?')){await DB.orders.delete(id);rO();updBadge();tst('Удалено','w')}};
+window.openO=async id=>{
+  curOID=id;const o=await DB.orders.get(id);if(!o)return;
   $('OMT').textContent='Заказ '+o.id;
   $('OMB').innerHTML=`<div class="pipe">${['new','confirmed','delivery','done','cancelled'].map(s=>`<button class="pip${o.status===s?' cur':''}" onclick="pipeO('${o.id}','${s}')">${SL[s]}</button>`).join('')}</div><div class="odg"><div class="db"><div class="db-t">Клиент</div><div class="dr"><span>Имя</span><span>${o.customerName}</span></div><div class="dr"><span>Тел</span><span>${o.phone||'—'}</span></div><div class="dr"><span>Email</span><span>${o.email||'—'}</span></div></div><div class="db"><div class="db-t">Доставка</div><div class="dr"><span>Адрес</span><span>${o.address||'—'}</span></div><div class="dr"><span>Дата</span><span>${o.deliveryDate||'—'} в ${o.deliveryTime||'—'}</span></div><div class="dr"><span>Комм.</span><span>${o.note||'—'}</span></div></div></div><table><thead><tr><th>Товар</th><th>Цена</th><th>Кол-во</th><th>Итого</th></tr></thead><tbody>${(o.items||[]).map(i=>`<tr><td>${i.name}</td><td>${fmt(i.price)}</td><td>${i.qty}</td><td style="font-family:var(--fd);text-align:right">${fmt(i.price*i.qty)}</td></tr>`).join('')}</tbody></table><div style="display:flex;justify-content:flex-end;gap:18px;padding:12px;background:var(--bg2);border-radius:8px;margin-top:12px"><span style="font-size:.82rem;color:var(--mut)">Доставка: <span style="color:var(--txt)">${fmt(o.deliveryCost)}</span></span><span style="font-family:var(--fd);font-size:1.15rem;color:var(--gld)">Итого: ${fmt(o.total)}</span></div><div style="margin-top:12px;display:flex;gap:7px;flex-wrap:wrap"><span class="b b-${o.paymentStatus}">${o.paymentStatus==='paid'?'Оплачен':'Ожидает'}</span><span style="font-size:.75rem;color:var(--mut)">${o.paymentMethod||''}</span><span style="font-size:.75rem;color:var(--mut)">${fmtDT(o.createdAt)}</span></div>`;
   oM('OM');
 };
-window.pipeO=(id,st)=>{DB.orders.update(id,{status:st});updBadge();tst('Статус обновлён');openO(id);rO()};
-window.delCurO=()=>{if(curOID&&confirm('Удалить?')){DB.orders.delete(curOID);cM('OM');rO();updBadge();tst('Удалено','w')}};
+window.pipeO=async(id,st)=>{await DB.orders.update(id,{status:st});updBadge();tst('Статус обновлён');openO(id);rO()};
+window.delCurO=async()=>{if(curOID&&confirm('Удалить?')){await DB.orders.delete(curOID);cM('OM');rO();updBadge();tst('Удалено','w')}};
 
 // PRODUCTS
-function fillCatSels(){
-  const cats=DB.categories.getAll();
+async function fillCatSels(){
+  const cats=await DB.categories.getAll();
   ['pCF','pC'].forEach(id=>{const el=$(id);if(!el)return;const pv=el.value;el.innerHTML=(id==='pCF'?'<option value="">Все категории</option>':'')+cats.map(c=>`<option value="${c.id}">${c.icon||''} ${c.name}</option>`).join('');el.value=pv});
 }
-function rPrd(){
-  fillCatSels();
+async function rPrd(){
+  try{
+  await fillCatSels();
   const s=$('pSrch').value.trim(),cat=$('pCF').value,av=$('pAF').value;
-  let list=DB.products.getAll({search:s,category:cat||undefined});
+  let list=await DB.products.getAll({search:s,category:cat||undefined});
   if(av==='1')list=list.filter(p=>p.active);if(av==='0')list=list.filter(p=>!p.active);
-  const cats=Object.fromEntries(DB.categories.getAll().map(c=>[c.id,c]));
+  const catList=await DB.categories.getAll();
+  const cats=Object.fromEntries(catList.map(c=>[c.id,c]));
   $('pGrid').innerHTML=list.length?list.map(p=>`<div class="pc${p.active?'':' off'}"><div class="pc-img">${p.image?`<img src="${p.image}" alt="${p.name}"/>`:`${cats[p.category]?.icon||'🌹'}`}${p.badge?`<span class="pc-badge pc-badge-${p.badge}">${p.badge==='hit'?'Хит':p.badge==='new'?'Новинка':'Премиум'}</span>`:''}</div><div class="pc-body"><div class="pc-name" title="${p.name}">${p.name}</div><div class="pc-cat">${cats[p.category]?.icon||''} ${cats[p.category]?.name||p.category}</div><div class="pc-foot"><div class="pc-price">${fmt(p.price)}</div><div class="pc-acts"><button class="btn bg bic bsm" onclick="editP('${p.id}')" title="Редактировать">✎</button><button class="btn bg bic bsm" onclick="togP('${p.id}')" title="${p.active?'Скрыть':'Показать'}">${p.active?'👁':'🚫'}</button><button class="btn bd bic bsm" onclick="delP('${p.id}')" title="Удалить">✕</button></div></div></div></div>`).join(''):`<div class="es" style="grid-column:1/-1"><div class="es-ic">🌸</div><h4>Товары не найдены</h4></div>`;
+  }catch(e){console.error('rPrd',e)}
 }
 $('pSrch').oninput=rPrd;$('pCF').onchange=rPrd;$('pAF').onchange=rPrd;
-window.openPM=()=>{editPID=null;$('PMT').textContent='Новый товар';$('pID').value='';$('pN').value='';$('pDs').value='';$('pPr').value='';$('pOP').value='';$('pW').value='';$('pH').value='';$('pBd').value='';$('pAct').checked=true;rmImg();galImgs=[];rGal();fillCatSels();oM('PM')};
-window.editP=id=>{
-  editPID=id;const p=DB.products.get(id);if(!p)return;
+window.openPM=async()=>{editPID=null;$('PMT').textContent='Новый товар';$('pID').value='';$('pN').value='';$('pDs').value='';$('pPr').value='';$('pOP').value='';$('pW').value='';$('pH').value='';$('pBd').value='';$('pAct').checked=true;rmImg();galImgs=[];rGal();await fillCatSels();oM('PM')};
+window.editP=async id=>{
+  editPID=id;const p=await DB.products.get(id);if(!p)return;
   $('PMT').textContent='Редактировать';$('pID').value=p.id;$('pN').value=p.name;$('pDs').value=p.desc||'';$('pPr').value=p.price;$('pOP').value=p.oldPrice||'';$('pW').value=p.width||'';$('pH').value=p.height||'';$('pBd').value=p.badge||'';$('pAct').checked=p.active;
-  fillCatSels();$('pC').value=p.category||'';
+  await fillCatSels();$('pC').value=p.category||'';
   if(p.image){imgD=p.image;$('mIPrev').src=p.image;$('mIPrev').style.display='block';$('mIP').style.display='none';$('mIRm').style.display='flex'}else rmImg();
   galImgs=p.gallery||[];rGal();oM('PM');
 };
-window.saveProd=()=>{
+window.saveProd=async()=>{
   const name=$('pN').value.trim(),price=parseInt($('pPr').value);
   if(!name){tst('Введите название','e');return}if(!price||price<1){tst('Введите цену','e');return}
   const d={name,price,desc:$('pDs').value.trim(),oldPrice:parseInt($('pOP').value)||null,category:$('pC').value,badge:$('pBd').value||null,active:$('pAct').checked,image:imgD,gallery:galImgs,width:$('pW').value,height:$('pH').value};
-  if(editPID){DB.products.update(editPID,d);tst('Товар обновлён')}else{DB.products.create(d);tst('Товар добавлен')}
+  if(editPID){await DB.products.update(editPID,d);tst('Товар обновлён')}else{await DB.products.create(d);tst('Товар добавлен')}
   cM('PM');rPrd();
 };
-window.togP=id=>{const p=DB.products.get(id);DB.products.update(id,{active:!p.active});rPrd();tst(p.active?'Скрыт':'Активирован')};
-window.delP=id=>{if(confirm('Удалить товар?')){DB.products.delete(id);rPrd();tst('Удалено','w')}};
+window.togP=async id=>{const p=await DB.products.get(id);await DB.products.update(id,{active:!p.active});rPrd();tst(p.active?'Скрыт':'Активирован')};
+window.delP=async id=>{if(confirm('Удалить товар?')){await DB.products.delete(id);rPrd();tst('Удалено','w')}};
 $('mII').onchange=e=>{const f=e.target.files[0];if(!f)return;if(f.size>5*1024*1024){tst('Файл слишком большой','e');return}const r=new FileReader();r.onload=ev=>{imgD=ev.target.result;$('mIPrev').src=imgD;$('mIPrev').style.display='block';$('mIP').style.display='none';$('mIRm').style.display='flex'};r.readAsDataURL(f)};
 window.rmImg=e=>{e?.stopPropagation();imgD=null;$('mIPrev').src='';$('mIPrev').style.display='none';$('mIP').style.display='';$('mIRm').style.display='none';if($('mII'))$('mII').value=''};
 const mIA=$('mIA');
@@ -487,104 +496,110 @@ gIA.addEventListener('dragleave',()=>gIA.classList.remove('drag'));
 gIA.addEventListener('drop',e=>{e.preventDefault();gIA.classList.remove('drag');Array.from(e.dataTransfer.files).forEach(f=>{if(!f.type.startsWith('image/'))return;const r=new FileReader();r.onload=ev=>{galImgs.push(ev.target.result);rGal()};r.readAsDataURL(f)})});
 
 // CATEGORIES
-function rCat(){
-  const cats=DB.categories.getAll(),prods=DB.products.getAll();
+async function rCat(){
+  try{
+  const cats=await DB.categories.getAll(),prods=await DB.products.getAll();
   const cnt=Object.fromEntries(cats.map(c=>[c.id,prods.filter(p=>p.category===c.id).length]));
   $('cList').innerHTML=cats.length?cats.map(c=>`<div class="ci"><span class="drag-h">⠿</span><div class="ci-icon">${c.icon||'📦'}</div><div class="ci-info"><div class="ci-name">${c.name}</div><div class="ci-cnt">${cnt[c.id]||0} товаров · id: ${c.id}</div></div><div class="ci-acts"><button class="btn bg bsm" onclick="editCat('${c.id}')">✎</button><button class="btn bd bsm" onclick="delCat('${c.id}')">✕</button></div></div>`).join(''):`<div class="es"><div class="es-ic">📦</div><h4>Нет категорий</h4></div>`;
   catCh?.destroy();catCh=new Chart($('cCat'),{type:'doughnut',data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>cnt[c.id]||0),backgroundColor:['#c9a96e','#4aaa6a','#5590e0','#e09040','#e05555','#9a7a9a'],borderColor:'#1a2e1a',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8a9a8a',font:{size:10},padding:10}}}}});
+  }catch(e){console.error('rCat',e)}
 }
 window.openCM=()=>{$('CMT').textContent='Новая категория';$('cID').value='';$('cNm').value='';$('cIc').value='';$('cEID').value='';$('cID').disabled=false;oM('CM')};
-window.editCat=id=>{const c=DB.categories.get(id);if(!c)return;$('CMT').textContent='Редактировать';$('cID').value=c.id;$('cID').disabled=true;$('cNm').value=c.name;$('cIc').value=c.icon||'';$('cEID').value=c.id;oM('CM')};
-window.saveCat=()=>{const eid=$('cEID').value,nm=$('cNm').value.trim(),ic=$('cIc').value.trim(),id=$('cID').value.trim().toLowerCase().replace(/\s+/g,'_');if(!nm||!id){tst('Заполните ID и название','e');return}if(eid){DB.categories.update(eid,{name:nm,icon:ic});tst('Обновлено')}else{if(DB.categories.get(id)){tst('Такой ID уже есть','e');return}DB.categories.create({id,name:nm,icon:ic});tst('Добавлено')}cM('CM');rCat()};
-window.delCat=id=>{const p=DB.products.getAll({category:id});if(p.length){tst(`Нельзя: ${p.length} товаров в категории`,'e');return}if(confirm('Удалить?')){DB.categories.delete(id);rCat();tst('Удалено','w')}};
+window.editCat=async id=>{const c=await DB.categories.get(id);if(!c)return;$('CMT').textContent='Редактировать';$('cID').value=c.id;$('cID').disabled=true;$('cNm').value=c.name;$('cIc').value=c.icon||'';$('cEID').value=c.id;oM('CM')};
+window.saveCat=async()=>{const eid=$('cEID').value,nm=$('cNm').value.trim(),ic=$('cIc').value.trim(),id=$('cID').value.trim().toLowerCase().replace(/\s+/g,'_');if(!nm||!id){tst('Заполните ID и название','e');return}if(eid){await DB.categories.update(eid,{name:nm,icon:ic});tst('Обновлено')}else{await DB.categories.create({id,name:nm,icon:ic});tst('Добавлено')}cM('CM');rCat()};
+window.delCat=async id=>{const p=await DB.products.getAll({category:id});if(p.length){tst(`Нельзя: ${p.length} товаров в категории`,'e');return}if(confirm('Удалить?')){await DB.categories.delete(id);rCat();tst('Удалено','w')}};
 
 // CUSTOMERS
-function rCu(){
+async function rCu(){
+  try{
   const s=$('cuSrch').value.trim().toLowerCase();
-  let users=DB.users.getAll().filter(u=>u.role!=='admin');
+  let users=(await DB.users.getAll()).filter(u=>u.role!=='admin');
   if(s)users=users.filter(u=>u.name?.toLowerCase().includes(s)||u.email?.toLowerCase().includes(s)||u.phone?.includes(s));
-  const orders=DB.orders.getAll();
+  const orders=await DB.orders.getAll();
   document.querySelector('#cuT tbody').innerHTML=users.length?users.map(u=>{const uo=orders.filter(o=>o.userId===u.id);const tot=uo.filter(o=>o.paymentStatus==='paid').reduce((s,o)=>s+o.total,0);return`<tr><td><div style="display:flex;align-items:center;gap:9px"><div style="width:30px;height:30px;background:var(--gld);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--fd);color:var(--bg);font-size:.85rem;flex-shrink:0">${(u.name||'?')[0].toUpperCase()}</div><div><div style="font-size:.82rem;color:var(--crm)">${u.name}</div><div style="font-size:.68rem;color:var(--mut)">с ${fmtD(u.createdAt)}</div></div></div></td><td style="color:var(--mut);font-size:.8rem">${u.email}</td><td style="color:var(--mut);font-size:.8rem">${u.phone||'—'}</td><td style="font-family:var(--fd)">${uo.length}</td><td style="font-family:var(--fd);color:var(--gld)">${fmt(tot)}</td><td style="font-size:.75rem;color:var(--mut)">${uo[0]?fmtD(uo[0].createdAt):'—'}</td><td><span class="b b-active">Клиент</span></td><td><button class="btn bd bsm" onclick="delU('${u.id}')">Удалить</button></td></tr>`}).join(''):`<tr><td colspan="8"><div class="es"><div class="es-ic">👤</div><h4>Нет клиентов</h4></div></td></tr>`;
+  }catch(e){console.error('rCu',e)}
 }
 $('cuSrch').oninput=rCu;
-window.delU=id=>{if(confirm('Удалить клиента?')){DB.users.delete(id);rCu();tst('Удалено','w')}};
+window.delU=async id=>{if(confirm('Удалить клиента?')){await DB.users.delete(id);rCu();tst('Удалено','w')}};
 
 // ANALYTICS
-function rAn(){
-  const orders=DB.orders.getAll(),paid=orders.filter(o=>o.paymentStatus==='paid');
+async function rAn(){
+  try{
+  const orders=await DB.orders.getAll(),paid=orders.filter(o=>o.paymentStatus==='paid');
   const rev=paid.reduce((s,o)=>s+o.total,0),avg=paid.length?Math.round(rev/paid.length):0;
-  $('aStats').innerHTML=`<div class="sc sc--gld"><div class="sc-lbl">Выручка</div><div class="sc-val">${(rev/1000).toFixed(1)}<span style="font-size:.8rem">к ₽</span></div></div><div class="sc"><div class="sc-lbl">Заказов</div><div class="sc-val">${orders.length}</div></div><div class="sc"><div class="sc-lbl">Средний чек</div><div class="sc-val">${(avg/1000).toFixed(1)}<span style="font-size:.8rem">к ₽</span></div></div><div class="sc"><div class="sc-lbl">Клиентов</div><div class="sc-val">${DB.users.getAll().filter(u=>u.role!=='admin').length}</div></div>`;
+  const users=(await DB.users.getAll()).filter(u=>u.role!=='admin');
+  $('aStats').innerHTML=`<div class="sc sc--gld"><div class="sc-lbl">Выручка</div><div class="sc-val">${(rev/1000).toFixed(1)}<span style="font-size:.8rem">к ₽</span></div></div><div class="sc"><div class="sc-lbl">Заказов</div><div class="sc-val">${orders.length}</div></div><div class="sc"><div class="sc-lbl">Средний чек</div><div class="sc-val">${(avg/1000).toFixed(1)}<span style="font-size:.8rem">к ₽</span></div></div><div class="sc"><div class="sc-lbl">Клиентов</div><div class="sc-val">${users.length}</div></div>`;
   Object.values(ach).forEach(c=>c.destroy());ach={};
   const d30=Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);return d});
   ach.rev=new Chart($('aRev'),{type:'bar',data:{labels:d30.map(d=>d.getDate()+'.'+('0'+(d.getMonth()+1)).slice(-2)),datasets:[{data:d30.map(d=>paid.filter(o=>new Date(o.createdAt).toDateString()===d.toDateString()).reduce((s,o)=>s+o.total,0)),backgroundColor:'rgba(201,169,110,.6)',borderColor:'#c9a96e',borderWidth:1,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:8,color:'#8a9a8a',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#8a9a8a',font:{size:9},callback:v=>(v/1000).toFixed(0)+'к'},grid:{color:'rgba(255,255,255,.04)'}}}}});
-  const cats=DB.categories.getAll();
-  const cSales=cats.map(c=>paid.flatMap(o=>o.items||[]).filter(i=>{const p=DB.products.get(i.productId);return p&&p.category===c.id}).reduce((s,i)=>s+i.price*i.qty,0));
+  const cats=await DB.categories.getAll();
+  const allProds=await DB.products.getAll();
+  const prodsMap=Object.fromEntries(allProds.map(p=>[p.id,p]));
+  const cSales=cats.map(c=>paid.flatMap(o=>o.items||[]).filter(i=>{const p=prodsMap[i.productId];return p&&p.category===c.id}).reduce((s,i)=>s+i.price*i.qty,0));
   ach.cat=new Chart($('aCat'),{type:'pie',data:{labels:cats.map(c=>c.name),datasets:[{data:cSales,backgroundColor:['#c9a96e','#4aaa6a','#5590e0','#e09040','#e05555'],borderColor:'#1a2e1a',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8a9a8a',font:{size:10},padding:8}}}}});
   const ps={};paid.forEach(o=>(o.items||[]).forEach(i=>{ps[i.name]=(ps[i.name]||0)+i.price*i.qty}));
   const top=Object.entries(ps).sort((a,b)=>b[1]-a[1]).slice(0,5);
   ach.top=new Chart($('aTop'),{type:'bar',data:{labels:top.map(([n])=>n.length>14?n.slice(0,14)+'…':n),datasets:[{data:top.map(([,v])=>v),backgroundColor:'rgba(74,170,106,.6)',borderColor:'#4aaa6a',borderWidth:1,borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8a9a8a',font:{size:9},callback:v=>(v/1000).toFixed(0)+'к'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#8a9a8a',font:{size:9}},grid:{display:false}}}}});
-  const users=DB.users.getAll().filter(u=>u.role!=='admin');
   const wks=Array.from({length:8},(_,i)=>{const d=new Date();d.setDate(d.getDate()-7*(7-i));return d});
   ach.usr=new Chart($('aUsr'),{type:'line',data:{labels:wks.map(d=>d.toLocaleDateString('ru',{day:'numeric',month:'short'})),datasets:[{data:wks.map((d,i)=>{const nx=new Date(d);nx.setDate(nx.getDate()+7);return users.filter(u=>{const c=new Date(u.createdAt);return c>=d&&c<nx}).length}),borderColor:'#5590e0',backgroundColor:'rgba(85,144,224,.1)',tension:.4,fill:true,pointBackgroundColor:'#5590e0',pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8a9a8a',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#8a9a8a',font:{size:9},stepSize:1},grid:{color:'rgba(255,255,255,.04)'}}}}});
+  }catch(e){console.error('rAn',e)}
 }
 
 // SETTINGS
-function rSet(){
-  const s=DB.settings.get();
+async function rSet(){
+  try{
+  const s=await DB.settings.get();
   $('sGrid').innerHTML=`
     <div class="ss"><h3>Магазин</h3>
-      <div class="fg"><label class="fl">Название</label><input type="text" class="fi" id="sNm" value="${s.shopName||''}"/></div>
+      <div class="fg"><label class="fl">Название</label><input type="text" class="fi" id="sNm" value="${s.shop_name||s.shopName||''}"/></div>
       <div class="fg"><label class="fl">Телефон</label><input type="text" class="fi" id="sPh" value="${s.phone||''}"/></div>
       <div class="fg"><label class="fl">Email</label><input type="email" class="fi" id="sEm" value="${s.email||''}"/></div>
       <div class="fg"><label class="fl">Адрес</label><input type="text" class="fi" id="sAd" value="${s.address||''}"/></div>
       <button class="btn bp" onclick="svShop()">Сохранить</button>
     </div>
     <div class="ss"><h3>Доставка</h3>
-      <div class="fg"><label class="fl">Стоимость доставки (₽)</label><input type="number" class="fi" id="sDl" value="${s.deliveryPrice||500}"/></div>
-      <div class="fg"><label class="fl">Бесплатная доставка от (₽)</label><input type="number" class="fi" id="sFF" value="${s.freeFrom||3000}"/></div>
-      <div class="fg"><label class="fl">Мин. время выполнения (ч)</label><input type="number" class="fi" id="sLH" value="${s.minLeadHours||2}"/></div>
-      <div class="tr2"><label>Доставка 24/7</label><label class="tsw"><input type="checkbox" id="sD24" ${s.delivery24_7?'checked':''}/><span></span></label></div>
+      <div class="fg"><label class="fl">Стоимость доставки (₽)</label><input type="number" class="fi" id="sDl" value="${s.delivery_price||s.deliveryPrice||500}"/></div>
+      <div class="fg"><label class="fl">Бесплатная доставка от (₽)</label><input type="number" class="fi" id="sFF" value="${s.free_from||s.freeFrom||3000}"/></div>
+      <div class="fg"><label class="fl">Мин. время выполнения (ч)</label><input type="number" class="fi" id="sLH" value="${s.min_lead_hours||s.minLeadHours||2}"/></div>
+      <div class="tr2"><label>Доставка 24/7</label><label class="tsw"><input type="checkbox" id="sD24" ${(s.delivery_24_7||s.delivery24_7)==='true'||s.delivery_24_7===true?'checked':''}/><span></span></label></div>
       <div style="margin-top:12px"><button class="btn bp" onclick="svDel()">Сохранить</button></div>
     </div>
-    <div class="ss" style="grid-column:1/-1"><h3>🏦 ЮKassa — Настройки оплаты</h3>
+    <div class="ss" style="grid-column:1/-1"><h3>ЮKassa — Настройки оплаты</h3>
       <div style="background:rgba(201,169,110,.06);border:1px solid rgba(201,169,110,.2);border-radius:9px;padding:14px;margin-bottom:16px;font-size:.78rem;color:var(--mut);line-height:1.7">
         <strong style="color:var(--gld)">Подключение ЮKassa:</strong><br>
-        1. Зарегистрируйтесь на <a href="https://yookassa.ru" target="_blank" style="color:var(--gld)">yookassa.ru</a> как ИП или юрлицо<br>
-        2. Пройдите верификацию → получите <code>shopId</code> и <code>secretKey</code><br>
-        3. Установите пакет: <code>npm install @a2seven/yoo-checkout</code><br>
-        4. Создайте эндпоинт <code>POST /api/payments/create</code> на сервере, который:<br>
-        &nbsp;&nbsp;• Принимает <code>{orderId, amount, email}</code><br>
-        &nbsp;&nbsp;• Вызывает YooKassa API и возвращает <code>{confirmation_token}</code><br>
-        5. Настройте webhook <code>POST /api/payments/webhook</code> для обновления статуса<br>
-        6. Вставьте <code>shopId</code> ниже — виджет активируется автоматически на странице оплаты
+        1. Зарегистрируйтесь на <a href="https://yookassa.ru" target="_blank" style="color:var(--gld)">yookassa.ru</a><br>
+        2. Получите <code>shopId</code> и <code>secretKey</code><br>
+        3. Вставьте <code>shopId</code> ниже и <code>secretKey</code> в переменную окружения <code>YOOKASSA_SECRET_KEY</code> на сервере
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="fg"><label class="fl">Shop ID</label><input type="text" class="fi" id="sYK" value="${s.yookassaShopId||''}" placeholder="1234567"/></div>
-        <div class="fg"><label class="fl">Return URL после оплаты</label><input type="text" class="fi" id="sYR" value="${s.yookassaReturnUrl||''}"/></div>
+        <div class="fg"><label class="fl">Shop ID</label><input type="text" class="fi" id="sYK" value="${s.yookassa_shop_id||''}" placeholder="1234567"/></div>
+        <div class="fg"><label class="fl">Return URL</label><input type="text" class="fi" id="sYR" value="${s.yookassa_return_url||''}"/></div>
       </div>
-      <button class="btn bp" onclick="svPay()">Сохранить настройки ЮKassa</button>
+      <button class="btn bp" onclick="svPay()">Сохранить</button>
     </div>
     <div class="ss"><h3>Уведомления</h3>
-      <div class="tr2"><label>Email при новом заказе</label><label class="tsw"><input type="checkbox" id="sNE" ${s.notifyEmail?'checked':''}/><span></span></label></div>
-      <div class="tr2"><label>SMS уведомления</label><label class="tsw"><input type="checkbox" id="sNS" ${s.notifySMS?'checked':''}/><span></span></label></div>
-      <div class="tr2"><label>Telegram-бот</label><label class="tsw"><input type="checkbox" id="sNT" ${s.notifyTelegram?'checked':''}/><span></span></label></div>
-      <div class="tr2"><label>Ежедневный отчёт</label><label class="tsw"><input type="checkbox" id="sNR" ${s.dailyReport?'checked':''}/><span></span></label></div>
+      <div class="tr2"><label>Email при новом заказе</label><label class="tsw"><input type="checkbox" id="sNE" ${s.notify_email==='true'?'checked':''}/><span></span></label></div>
+      <div class="tr2"><label>SMS уведомления</label><label class="tsw"><input type="checkbox" id="sNS" ${s.notify_sms==='true'?'checked':''}/><span></span></label></div>
+      <div class="tr2"><label>Telegram-бот</label><label class="tsw"><input type="checkbox" id="sNT" ${s.notify_telegram==='true'?'checked':''}/><span></span></label></div>
+      <div class="tr2"><label>Ежедневный отчёт</label><label class="tsw"><input type="checkbox" id="sNR" ${s.daily_report==='true'?'checked':''}/><span></span></label></div>
       <div style="margin-top:12px"><button class="btn bp" onclick="svNotif()">Сохранить</button></div>
     </div>
     <div class="ss"><h3>Смена пароля</h3>
+      <div class="fg"><label class="fl">Текущий пароль</label><input type="password" class="fi" id="sCP"/></div>
       <div class="fg"><label class="fl">Новый пароль</label><input type="password" class="fi" id="sAP"/></div>
       <div class="fg"><label class="fl">Повторите</label><input type="password" class="fi" id="sAP2"/></div>
       <button class="btn bo" onclick="chPass()">Изменить пароль</button>
     </div>`;
+  }catch(e){console.error('rSet',e)}
 }
-window.svShop=()=>{DB.settings.update({shopName:$('sNm').value,phone:$('sPh').value,email:$('sEm').value,address:$('sAd').value});tst('Сохранено')};
-window.svDel=()=>{DB.settings.update({deliveryPrice:parseInt($('sDl').value),freeFrom:parseInt($('sFF').value),minLeadHours:parseInt($('sLH').value),delivery24_7:$('sD24').checked});tst('Сохранено')};
-window.svPay=()=>{DB.settings.update({yookassaShopId:$('sYK').value,yookassaReturnUrl:$('sYR').value});tst('ЮKassa настройки сохранены')};
-window.svNotif=()=>{DB.settings.update({notifyEmail:$('sNE').checked,notifySMS:$('sNS').checked,notifyTelegram:$('sNT').checked,dailyReport:$('sNR').checked});tst('Сохранено')};
-window.chPass=()=>{const p1=$('sAP').value,p2=$('sAP2').value;if(p1.length<6){tst('Мин. 6 символов','e');return}if(p1!==p2){tst('Не совпадают','e');return}const a=DB.users.getAll().find(u=>u.role==='admin');if(a){DB.users.update(a.id,{passwordHash:btoa(encodeURIComponent(p1))});tst('Пароль изменён')}};
+window.svShop=async()=>{await DB.settings.update({shop_name:$('sNm').value,phone:$('sPh').value,email:$('sEm').value,address:$('sAd').value});tst('Сохранено')};
+window.svDel=async()=>{await DB.settings.update({delivery_price:$('sDl').value,free_from:$('sFF').value,min_lead_hours:$('sLH').value,delivery_24_7:String($('sD24').checked)});tst('Сохранено')};
+window.svPay=async()=>{await DB.settings.update({yookassa_shop_id:$('sYK').value,yookassa_return_url:$('sYR').value});tst('Сохранено')};
+window.svNotif=async()=>{await DB.settings.update({notify_email:String($('sNE').checked),notify_sms:String($('sNS').checked),notify_telegram:String($('sNT').checked),daily_report:String($('sNR').checked)});tst('Сохранено')};
+window.chPass=async()=>{const cp=$('sCP').value,p1=$('sAP').value,p2=$('sAP2').value;if(p1.length<6){tst('Мин. 6 символов','e');return}if(p1!==p2){tst('Не совпадают','e');return}try{await DB.users.changePass({currentPassword:cp,newPassword:p1});tst('Пароль изменён')}catch(e){tst(e.message,'e')}};
 
 document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
-$('gSearch').oninput=e=>{const q=e.target.value.trim();if(!q)return;const ords=DB.orders.getAll({search:q});if(ords.length){gP('orders');$('oSrch').value=q;rO()}else{gP('products');$('pSrch').value=q;rPrd()}};
+$('gSearch').oninput=async e=>{const q=e.target.value.trim();if(!q)return;const ords=await DB.orders.getAll({search:q});if(ords.length){gP('orders');$('oSrch').value=q;rO()}else{gP('products');$('pSrch').value=q;rPrd()}};
 </script>
 </body>
 </html>

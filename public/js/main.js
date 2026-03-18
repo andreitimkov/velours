@@ -77,14 +77,12 @@ const revealObserver = new IntersectionObserver(entries => {
 document.querySelectorAll('.reveal, [data-counter]').forEach(el => revealObserver.observe(el));
 
 // ── CATALOG ────────────────────────────────
-function renderCatalog(categoryFilter = 'all') {
+async function renderCatalog(categoryFilter = 'all') {
   const grid    = document.getElementById('catalogGrid');
-  const products = DB.products.getAll({ active: true });
-  const cats     = DB.categories.getAll();
-  const sess     = DB.session.get();
-  const favs     = sess ? (DB.users.get(sess.userId)?.favorites || []) : [];
-
   if (!grid) return;
+  try {
+  const products = await DB.products.getAll({ active: true });
+  const sess     = DB.session.get();
 
   // filter
   const filtered = categoryFilter === 'all' ? products : products.filter(p => p.category === categoryFilter);
@@ -129,19 +127,22 @@ function renderCatalog(categoryFilter = 'all') {
 
   // fav buttons
   grid.querySelectorAll('[data-fav]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const sess = DB.session.get();
       if (!sess) { window.location.href='/pages/auth.html?redirect=/#catalog'; return; }
-      const user = DB.users.get(sess.userId);
-      const favs = user.favorites || [];
-      const id   = btn.dataset.fav;
-      const newFavs = favs.includes(id) ? favs.filter(f=>f!==id) : [...favs, id];
-      DB.users.update(sess.userId, { favorites: newFavs });
-      btn.classList.toggle('active', newFavs.includes(id));
-      btn.textContent = newFavs.includes(id) ? '♥' : '♡';
-      showToast(newFavs.includes(id) ? '♥ Добавлено в избранное' : '♡ Удалено из избранного');
+      try {
+        const user = await DB.users.me();
+        const favs = user.favorites || [];
+        const id   = btn.dataset.fav;
+        const newFavs = favs.includes(id) ? favs.filter(f=>f!==id) : [...favs, id];
+        await DB.users.update({ favorites: newFavs });
+        btn.classList.toggle('active', newFavs.includes(id));
+        btn.textContent = newFavs.includes(id) ? '♥' : '♡';
+        showToast(newFavs.includes(id) ? '♥ Добавлено в избранное' : '♡ Удалено из избранного');
+      } catch(e) { console.error(e); }
     });
   });
+  } catch(e) { console.error('renderCatalog', e); }
 }
 
 function flowerSVG(cat) {
@@ -151,12 +152,12 @@ function flowerSVG(cat) {
 }
 
 // ── CATALOG FILTERS ─────────────────────────
-function initCatalogFilters() {
+async function initCatalogFilters() {
   const filterWrap = document.getElementById('catalogFilters');
   if (!filterWrap) return;
 
   // populate dynamic category filters from DB
-  const cats = DB.categories.getAll();
+  const cats = await DB.categories.getAll();
   filterWrap.innerHTML = `<button class="filter-btn active" data-filter="all">Все</button>` +
     cats.map(c => `<button class="filter-btn" data-filter="${c.id}">${c.icon} ${c.name}</button>`).join('');
 
@@ -192,38 +193,41 @@ function initReviews() {
 
 // ── HERO ORDER MODAL ────────────────────────
 function initQuickOrder() {
-  document.addEventListener('click', e => {
+  document.addEventListener('click', async e => {
     const btn = e.target.closest('[data-quick-order]');
     if (!btn) return;
     const id  = btn.dataset.quickOrder;
-    const p   = DB.products.get(id);
-    if (p) {
-      document.getElementById('quickModalProduct').textContent = p.name;
-      document.getElementById('quickModal')?.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
+    try {
+      const p = await DB.products.get(id);
+      if (p) {
+        document.getElementById('quickModalProduct').textContent = p.name;
+        document.getElementById('quickModal')?.classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+    } catch(e) { console.error(e); }
   });
   document.querySelector('#quickModal .modal-close')?.addEventListener('click', () => {
     document.getElementById('quickModal')?.classList.remove('open');
     document.body.style.overflow = '';
   });
-  document.getElementById('quickOrderForm')?.addEventListener('submit', e => {
+  document.getElementById('quickOrderForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     const name  = document.getElementById('qName').value;
     const phone = document.getElementById('qPhone').value;
     const pName = document.getElementById('quickModalProduct').textContent;
-    // Create order
-    DB.orders.create({
-      customerName: name,
-      phone,
-      items: [],
-      total: 0,
-      deliveryDate: '',
-      deliveryTime: '',
-      address: 'Уточнить',
-      note: `Быстрый заказ: ${pName}`,
-      paymentMethod: 'pending',
-    });
+    try {
+      await DB.orders.create({
+        customerName: name,
+        phone,
+        items: [],
+        total: 0,
+        deliveryDate: '',
+        deliveryTime: '',
+        address: 'Уточнить',
+        note: `Быстрый заказ: ${pName}`,
+        paymentMethod: 'pending',
+      });
+    } catch(e) { console.error(e); }
     document.getElementById('quickModal').classList.remove('open');
     document.body.style.overflow = '';
     showToast('✓ Заявка принята! Мы перезвоним вам.');
@@ -233,7 +237,7 @@ function initQuickOrder() {
 
 // ── MAIN ORDER FORM ─────────────────────────
 function initOrderForm() {
-  document.getElementById('mainOrderForm')?.addEventListener('submit', e => {
+  document.getElementById('mainOrderForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     const data = {
       customerName: document.getElementById('oName').value,
@@ -248,8 +252,12 @@ function initOrderForm() {
       paymentStatus:'pending',
       userId:       DB.session.get()?.userId || null,
     };
-    const order = DB.orders.create(data);
-    showToast(`✓ Заказ ${order.id} принят! Ожидайте звонка.`);
+    try {
+      const order = await DB.orders.create(data);
+      showToast(`✓ Заказ ${order.id} принят! Ожидайте звонка.`);
+    } catch(err) {
+      showToast('✓ Заявка отправлена!');
+    }
     e.target.reset();
     DB.cart.clear();
   });

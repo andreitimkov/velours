@@ -270,41 +270,46 @@ if(!Auth.requireAuth('../pages/auth.html')) throw '';
 CartWidget.init();
 
 const session = DB.session.get();
-let user = DB.users.get(session.userId);
+let user = null;
 
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(type?' toast--'+type:'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
 
-// Sidebar
-document.getElementById('sidebarAvatar').querySelector('span').textContent = (user.name||'?')[0].toUpperCase();
-document.getElementById('avatarLetter').textContent = (user.name||'?')[0].toUpperCase();
-document.getElementById('sidebarName').textContent = user.name;
-document.getElementById('sidebarEmail').textContent = user.email;
+// Init
+(async()=>{
+  try { user = await DB.users.me(); } catch(e) { Auth.logout(); return; }
 
-// Nav
-document.querySelectorAll('.cabinet-nav-btn[data-cab]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.cabinet-nav-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.cab-panel').forEach(p=>p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('cab-'+btn.dataset.cab).classList.add('active');
-    loadPanel(btn.dataset.cab);
+  // Sidebar
+  document.getElementById('sidebarAvatar').querySelector('span').textContent = (user.name||'?')[0].toUpperCase();
+  document.getElementById('avatarLetter').textContent = (user.name||'?')[0].toUpperCase();
+  document.getElementById('sidebarName').textContent = user.name;
+  document.getElementById('sidebarEmail').textContent = user.email;
+
+  // Nav
+  document.querySelectorAll('.cabinet-nav-btn[data-cab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cabinet-nav-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.cab-panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('cab-'+btn.dataset.cab).classList.add('active');
+      loadPanel(btn.dataset.cab);
+    });
   });
-});
 
-document.getElementById('logoutBtn').addEventListener('click', () => Auth.logout());
+  document.getElementById('logoutBtn').addEventListener('click', () => Auth.logout());
+  loadPanel('orders');
+})();
 
-// Load panels
 function loadPanel(name) {
   if (name === 'orders') renderOrders();
   if (name === 'favorites') renderFavorites();
   if (name === 'addresses') renderAddresses();
   if (name === 'profile') fillProfile();
 }
-loadPanel('orders');
 
 // Orders
-function renderOrders() {
-  const orders = DB.orders.getAll({ userId: user.id });
+async function renderOrders() {
+  try {
+  const orders = await DB.orders.getMy();
   const el = document.getElementById('ordersList');
   if (!orders.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-state__icon">🌸</div><h3>Заказов пока нет</h3><p>Выберите букет и оформите первый заказ</p><a href="../index.html#catalog" class="btn btn--outline" style="margin-top:16px">Перейти в каталог</a></div>`;
@@ -334,25 +339,30 @@ function renderOrders() {
       </div>
     </div>
   `).join('');
+  } catch(e) { console.error('renderOrders', e); }
 }
 
-window.cancelOrder = function(id) {
+window.cancelOrder = async function(id) {
   if (confirm('Отменить заказ?')) {
-    DB.orders.update(id, { status: 'cancelled' });
+    await DB.orders.update(id, { status: 'cancelled' });
     renderOrders();
     showToast('Заказ отменён');
   }
 };
 
 // Favorites
-function renderFavorites() {
+async function renderFavorites() {
+  try {
+  user = await DB.users.me();
   const favIds = user.favorites || [];
   const el = document.getElementById('favGrid');
   if (!favIds.length) {
     el.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🤍</div><h3>Список пуст</h3><p>Добавляйте букеты в избранное нажав ♡</p></div>`;
     return;
   }
-  const prods = favIds.map(id => DB.products.get(id)).filter(Boolean);
+  const allProds = await DB.products.getAll();
+  const prodsMap = Object.fromEntries(allProds.map(p=>[p.id,p]));
+  const prods = favIds.map(id => prodsMap[id]).filter(Boolean);
   el.innerHTML = prods.map(p => `
     <div class="fav-card">
       <div class="fav-card__img">${p.image ? `<img src="${p.image}" alt="${p.name}" />` : '🌹'}</div>
@@ -366,20 +376,26 @@ function renderFavorites() {
       </div>
     </div>
   `).join('');
+  } catch(e) { console.error('renderFavorites', e); }
 }
 
-window.addToCart = function(id) {
-  const p = DB.products.get(id);
-  if (p) { DB.cart.add(p); CartWidget.open(); showToast('Добавлено в корзину'); }
+window.addToCart = async function(id) {
+  try {
+    const p = await DB.products.get(id);
+    if (p) { DB.cart.add(p); CartWidget.open(); showToast('Добавлено в корзину'); }
+  } catch(e) { console.error(e); }
 };
-window.removeFav = function(id) {
-  user = DB.users.update(user.id, { favorites: (user.favorites||[]).filter(f=>f!==id) });
-  renderFavorites();
+window.removeFav = async function(id) {
+  try {
+    user = await DB.users.me();
+    await DB.users.update({ favorites: (user.favorites||[]).filter(f=>f!==id) });
+    renderFavorites();
+  } catch(e) { console.error(e); }
 };
 
 // Addresses
 function renderAddresses() {
-  const addrs = user.addresses || [];
+  const addrs = user?.addresses || [];
   const el = document.getElementById('addressesGrid');
   el.innerHTML = addrs.map(a => `
     <div class="address-card">
@@ -391,10 +407,12 @@ function renderAddresses() {
   document.getElementById('addAddrBtn')?.addEventListener('click', openAddrModal);
 }
 
-window.removeAddr = function(id) {
-  user = DB.users.removeAddress(user.id, id);
-  renderAddresses();
-  showToast('Адрес удалён');
+window.removeAddr = async function(id) {
+  try {
+    user = await DB.users.removeAddress(user.id, id);
+    renderAddresses();
+    showToast('Адрес удалён');
+  } catch(e) { console.error(e); }
 };
 
 function openAddrModal() {
@@ -411,15 +429,17 @@ function closeAddrModal() {
 
 document.getElementById('addrCancel').addEventListener('click', closeAddrModal);
 document.getElementById('addrModal').addEventListener('click', e => { if (e.target===document.getElementById('addrModal')) closeAddrModal(); });
-document.getElementById('addrForm').addEventListener('submit', e => {
+document.getElementById('addrForm').addEventListener('submit', async e => {
   e.preventDefault();
-  user = DB.users.addAddress(user.id, {
-    tag:     document.getElementById('addrTag').value || 'Адрес',
-    street:  document.getElementById('addrStreet').value,
-    apt:     document.getElementById('addrApt').value,
-    floor:   document.getElementById('addrFloor').value,
-    comment: document.getElementById('addrComment').value,
-  });
+  try {
+    user = await DB.users.addAddress(user.id, {
+      tag:     document.getElementById('addrTag').value || 'Адрес',
+      street:  document.getElementById('addrStreet').value,
+      apt:     document.getElementById('addrApt').value,
+      floor:   document.getElementById('addrFloor').value,
+      comment: document.getElementById('addrComment').value,
+    });
+  } catch(e) { console.error(e); }
   closeAddrModal();
   renderAddresses();
   showToast('Адрес сохранён');
@@ -427,31 +447,36 @@ document.getElementById('addrForm').addEventListener('submit', e => {
 
 // Profile
 function fillProfile() {
+  if (!user) return;
   document.getElementById('pName').value  = user.name  || '';
   document.getElementById('pPhone').value = user.phone || '';
   document.getElementById('pEmail').value = user.email || '';
   document.getElementById('pBirthday').value = user.birthday || '';
 }
-document.getElementById('profileForm').addEventListener('submit', e => {
+document.getElementById('profileForm').addEventListener('submit', async e => {
   e.preventDefault();
-  user = DB.users.update(user.id, {
-    name:     document.getElementById('pName').value,
-    phone:    document.getElementById('pPhone').value,
-    email:    document.getElementById('pEmail').value,
-    birthday: document.getElementById('pBirthday').value,
-  });
-  document.getElementById('sidebarName').textContent = user.name;
-  showToast('Профиль обновлён');
+  try {
+    user = await DB.users.update({
+      name:     document.getElementById('pName').value,
+      phone:    document.getElementById('pPhone').value,
+      birthday: document.getElementById('pBirthday').value,
+    });
+    document.getElementById('sidebarName').textContent = user.name;
+    showToast('Профиль обновлён');
+  } catch(e) { showToast(e.message,'error'); }
 });
-document.getElementById('passwordForm').addEventListener('submit', e => {
+document.getElementById('passwordForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const cur = document.getElementById('curPass')?.value || '';
   const n1 = document.getElementById('newPass').value;
   const n2 = document.getElementById('newPass2').value;
   if (n1 !== n2) { showToast('Пароли не совпадают','error'); return; }
   if (n1.length < 6) { showToast('Минимум 6 символов','error'); return; }
-  DB.users.update(user.id, { passwordHash: btoa(encodeURIComponent(n1)) });
-  document.getElementById('passwordForm').reset();
-  showToast('Пароль изменён');
+  try {
+    await DB.users.changePass({ currentPassword: cur, newPassword: n1 });
+    document.getElementById('passwordForm').reset();
+    showToast('Пароль изменён');
+  } catch(e) { showToast(e.message,'error'); }
 });
 </script>
 </body>
