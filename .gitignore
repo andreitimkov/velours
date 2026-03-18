@@ -1,6 +1,0 @@
-node_modules/
-.env
-velours.db
-uploads/
-*.log
-.DS_Store
