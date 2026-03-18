@@ -68,13 +68,24 @@ function animateCounter(el) {
 const revealObserver = new IntersectionObserver(entries => {
   entries.forEach(e => {
     if (e.isIntersecting) {
-      e.target.classList.add('visible');
-      if (e.target.dataset.counter) animateCounter(e.target);
+      const delay = parseInt(e.target.dataset.delay) || 0;
+      setTimeout(() => {
+        e.target.classList.add('visible');
+        // If this element itself is a counter, animate it
+        if ('counter' in e.target.dataset) animateCounter(e.target);
+        // Also animate any counter children (e.g. inside a .reveal wrapper)
+        e.target.querySelectorAll('[data-counter]').forEach(animateCounter);
+      }, delay);
       revealObserver.unobserve(e.target);
     }
   });
 }, { threshold: 0.12 });
-document.querySelectorAll('.reveal, [data-counter]').forEach(el => revealObserver.observe(el));
+// Observe .reveal elements; counter spans are handled via their parent reveal
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+// Also observe standalone counters not inside a .reveal
+document.querySelectorAll('[data-counter]').forEach(el => {
+  if (!el.closest('.reveal')) revealObserver.observe(el);
+});
 
 // ── CATALOG ────────────────────────────────
 async function renderCatalog(categoryFilter = 'all') {

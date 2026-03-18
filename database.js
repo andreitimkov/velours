@@ -230,6 +230,7 @@ const users = {
   get: id => { const u = db.prepare('SELECT * FROM users WHERE id = ?').get(id); return u ? formatUser(u) : null; },
   findByEmail: email => { const u = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email); return u ? formatUser(u) : null; },
   findByEmailWithHash: email => db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email) || null,
+  getWithHash: id => db.prepare('SELECT * FROM users WHERE id = ?').get(id) || null,
   create: data => {
     const id = uid();
     const hash = bcrypt.hashSync(data.password, 10);

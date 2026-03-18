@@ -238,7 +238,7 @@ app.put('/api/users/me', authMiddleware, (req, res) => {
 
 app.put('/api/users/me/password', authMiddleware, (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  const user = users.get(req.user.userId);
+  const user = users.getWithHash(req.user.userId);
   if (!user || !users.verifyPassword(user, currentPassword)) return fail(res, 'Неверный текущий пароль', 401);
   if (!newPassword || newPassword.length < 6) return fail(res, 'Новый пароль должен содержать минимум 6 символов');
   users.update(req.user.userId, { password: newPassword });

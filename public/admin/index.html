@@ -599,6 +599,36 @@ window.svNotif=async()=>{await DB.settings.update({notify_email:String($('sNE').
 window.chPass=async()=>{const cp=$('sCP').value,p1=$('sAP').value,p2=$('sAP2').value;if(p1.length<6){tst('Мин. 6 символов','e');return}if(p1!==p2){tst('Не совпадают','e');return}try{await DB.users.changePass({currentPassword:cp,newPassword:p1});tst('Пароль изменён')}catch(e){tst(e.message,'e')}};
 
 document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+
+// ── Escape closes any open modal ──────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.mo.open').forEach(o => o.classList.remove('open'));
+  }
+});
+
+// ── Sidebar arrow key navigation ─────────────────────────────
+(function() {
+  const pages = ['dashboard','orders','products','categories','customers','analytics','settings'];
+  document.addEventListener('keydown', e => {
+    // Skip if focus is inside an input/textarea/select
+    if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+    const active = document.querySelector('.ni.on[data-p]');
+    if (!active) return;
+    const idx = pages.indexOf(active.dataset.p);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const next = pages[(idx + 1) % pages.length];
+      gP(next);
+      document.querySelector(`.ni[data-p="${next}"]`)?.focus();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prev = pages[(idx - 1 + pages.length) % pages.length];
+      gP(prev);
+      document.querySelector(`.ni[data-p="${prev}"]`)?.focus();
+    }
+  });
+})();
 $('gSearch').oninput=async e=>{const q=e.target.value.trim();if(!q)return;const ords=await DB.orders.getAll({search:q});if(ords.length){gP('orders');$('oSrch').value=q;rO()}else{gP('products');$('pSrch').value=q;rPrd()}};
 </script>
 </body>
