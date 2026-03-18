@@ -1,346 +1,361 @@
-// db.js — SQLite database layer using better-sqlite3
-const Database = require('better-sqlite3');
-const path = require('path');
-const bcrypt = require('bcryptjs');
+// database.js — PostgreSQL version (pg)
+const { Pool } = require('pg');
+const bcrypt    = require('bcryptjs');
 require('dotenv').config();
 
-const DB_PATH = process.env.DB_PATH || './velours.db';
-const db = new Database(DB_PATH);
-
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-// ─── SCHEMA ─────────────────────────────────────────────────
-db.exec(`
-  CREATE TABLE IF NOT EXISTS categories (
-    id        TEXT PRIMARY KEY,
-    name      TEXT NOT NULL,
-    icon      TEXT DEFAULT '',
-    sort      INTEGER DEFAULT 0,
-    created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
-  );
-
-  CREATE TABLE IF NOT EXISTS products (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    desc       TEXT DEFAULT '',
-    price      INTEGER NOT NULL,
-    old_price  INTEGER,
-    category   TEXT REFERENCES categories(id),
-    badge      TEXT,
-    active     INTEGER DEFAULT 1,
-    image      TEXT,
-    gallery    TEXT DEFAULT '[]',
-    width      TEXT,
-    height     TEXT,
-    sort       INTEGER DEFAULT 0,
-    created_at INTEGER DEFAULT (strftime('%s','now') * 1000),
-    updated_at INTEGER
-  );
-
-  CREATE TABLE IF NOT EXISTS users (
-    id            TEXT PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT UNIQUE NOT NULL,
-    phone         TEXT,
-    password_hash TEXT NOT NULL,
-    role          TEXT DEFAULT 'customer',
-    addresses     TEXT DEFAULT '[]',
-    favorites     TEXT DEFAULT '[]',
-    birthday      TEXT,
-    created_at    INTEGER DEFAULT (strftime('%s','now') * 1000)
-  );
-
-  CREATE TABLE IF NOT EXISTS orders (
-    id              TEXT PRIMARY KEY,
-    user_id         TEXT REFERENCES users(id),
-    customer_name   TEXT NOT NULL,
-    phone           TEXT,
-    email           TEXT,
-    recipient_name  TEXT,
-    recipient_phone TEXT,
-    card_text       TEXT,
-    address         TEXT,
-    delivery_date   TEXT,
-    delivery_time   TEXT,
-    delivery_type   TEXT DEFAULT 'courier',
-    delivery_cost   INTEGER DEFAULT 0,
-    note            TEXT,
-    items           TEXT DEFAULT '[]',
-    subtotal        INTEGER DEFAULT 0,
-    discount        INTEGER DEFAULT 0,
-    total           INTEGER NOT NULL,
-    status          TEXT DEFAULT 'new',
-    payment_method  TEXT,
-    payment_status  TEXT DEFAULT 'pending',
-    payment_id      TEXT,
-    created_at      INTEGER DEFAULT (strftime('%s','now') * 1000),
-    updated_at      INTEGER
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key   TEXT PRIMARY KEY,
-    value TEXT
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
-  CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
-  CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-  CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
-`);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
 
 // ─── HELPERS ────────────────────────────────────────────────
-const uid = () => require('uuid').v4().replace(/-/g, '').slice(0, 12);
-const now = () => Date.now();
-const parseJSON = (str, fallback = []) => { try { return JSON.parse(str); } catch { return fallback; } };
+const uid       = () => require('uuid').v4().replace(/-/g,'').slice(0,12);
+const now       = () => Date.now();
+const parseJSON = (v, fb = []) => { try { return JSON.parse(v); } catch { return fb; } };
+
+const q   = (text, params) => pool.query(text, params);
+const one = async (text, params) => { const r = await pool.query(text, params); return r.rows[0] || null; };
+const all = async (text, params) => { const r = await pool.query(text, params); return r.rows; };
+
+// ─── SCHEMA ─────────────────────────────────────────────────
+async function initSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      icon       TEXT DEFAULT '',
+      sort       INTEGER DEFAULT 0,
+      created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT * 1000
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      "desc"     TEXT DEFAULT '',
+      price      INTEGER NOT NULL,
+      old_price  INTEGER,
+      category   TEXT REFERENCES categories(id),
+      badge      TEXT,
+      active     BOOLEAN DEFAULT TRUE,
+      image      TEXT,
+      gallery    TEXT DEFAULT '[]',
+      width      TEXT,
+      height     TEXT,
+      sort       INTEGER DEFAULT 0,
+      created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT * 1000,
+      updated_at BIGINT
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      email         TEXT UNIQUE NOT NULL,
+      phone         TEXT,
+      password_hash TEXT NOT NULL,
+      role          TEXT DEFAULT 'customer',
+      addresses     TEXT DEFAULT '[]',
+      favorites     TEXT DEFAULT '[]',
+      birthday      TEXT,
+      created_at    BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT * 1000
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT REFERENCES users(id),
+      customer_name   TEXT NOT NULL,
+      phone           TEXT,
+      email           TEXT,
+      recipient_name  TEXT,
+      recipient_phone TEXT,
+      card_text       TEXT,
+      address         TEXT,
+      delivery_date   TEXT,
+      delivery_time   TEXT,
+      delivery_type   TEXT DEFAULT 'courier',
+      delivery_cost   INTEGER DEFAULT 0,
+      note            TEXT,
+      items           TEXT DEFAULT '[]',
+      subtotal        INTEGER DEFAULT 0,
+      discount        INTEGER DEFAULT 0,
+      total           INTEGER NOT NULL,
+      status          TEXT DEFAULT 'new',
+      payment_method  TEXT,
+      payment_status  TEXT DEFAULT 'pending',
+      payment_id      TEXT,
+      created_at      BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT * 1000,
+      updated_at      BIGINT
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+    CREATE INDEX IF NOT EXISTS idx_orders_user       ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
+    CREATE INDEX IF NOT EXISTS idx_orders_created    ON orders(created_at DESC);
+  `);
+}
 
 // ─── SEED ───────────────────────────────────────────────────
-function seed() {
-  const count = db.prepare('SELECT COUNT(*) as c FROM categories').get().c;
-  if (count > 0) return;
-
+async function seed() {
+  const row = await one('SELECT COUNT(*) AS c FROM categories');
+  if (parseInt(row.c) > 0) return;
   console.log('🌱 Seeding database...');
 
-  // Categories
-  const insertCat = db.prepare('INSERT OR IGNORE INTO categories (id, name, icon, sort) VALUES (?, ?, ?, ?)');
-  [
-    ['roses',   'Розы',       '🌹', 1],
-    ['mixed',   'Миксы',      '💐', 2],
-    ['mono',    'Монобукеты', '🌸', 3],
-    ['premium', 'Премиум',    '✨', 4],
-    ['dried',   'Сухоцветы',  '🌾', 5],
-  ].forEach(args => insertCat.run(...args));
+  for (const [id, name, icon, sort] of [
+    ['roses','Розы','🌹',1],['mixed','Миксы','💐',2],['mono','Монобукеты','🌸',3],
+    ['premium','Премиум','✨',4],['dried','Сухоцветы','🌾',5],
+  ]) {
+    await q('INSERT INTO categories (id,name,icon,sort) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING',[id,name,icon,sort]);
+  }
 
-  // Products
-  const insertProd = db.prepare(`INSERT OR IGNORE INTO products (id, name, desc, price, category, badge, active, sort) VALUES (?, ?, ?, ?, ?, ?, 1, ?)`);
-  [
-    ['p1','Бархатный сад',   'Пионовидные розы Пиаже, лаванда, эвкалипт', 4800, 'roses',   'hit',     1],
-    ['p2','Утренний туман',  'Белые пионы, лизиантус, гипсофила',          3600, 'mixed',   null,      2],
-    ['p3','Фиолетовый этюд', 'Лавандовые тюльпаны, ирисы, ежевика',       5200, 'mono',    'new',     3],
-    ['p4','Золотой час',     'Желтые пионы, мимоза, ранункулюс, зелень',   8900, 'premium', 'premium', 4],
-    ['p5','Алая страсть',    'Красные розы Эксплорер, 25 штук',            3200, 'roses',   null,      5],
-    ['p6','Небесный бриз',   'Синие ирисы, агапантус, делфиниум',          6400, 'mixed',   null,      6],
-    ['p7','Пастельный сон',  'Нежные пионы, фрезия, белая эустома',        4200, 'mono',    null,      7],
-    ['p8','Осенний закат',   'Сухоцветы, хлопок, лунария, ковыль',         3800, 'dried',   'new',     8],
-  ].forEach(args => insertProd.run(...args));
+  for (const [id,name,desc,price,category,badge,sort] of [
+    ['p1','Бархатный сад',  'Пионовидные розы Пиаже, лаванда, эвкалипт',  4800,'roses',  'hit',    1],
+    ['p2','Утренний туман', 'Белые пионы, лизиантус, гипсофила',           3600,'mixed',  null,     2],
+    ['p3','Фиолетовый этюд','Лавандовые тюльпаны, ирисы, ежевика',        5200,'mono',   'new',    3],
+    ['p4','Золотой час',    'Желтые пионы, мимоза, ранункулюс, зелень',   8900,'premium','premium',4],
+    ['p5','Алая страсть',   'Красные розы Эксплорер, 25 штук',            3200,'roses',  null,     5],
+    ['p6','Небесный бриз',  'Синие ирисы, агапантус, делфиниум',          6400,'mixed',  null,     6],
+    ['p7','Пастельный сон', 'Нежные пионы, фрезия, белая эустома',        4200,'mono',   null,     7],
+    ['p8','Осенний закат',  'Сухоцветы, хлопок, лунария, ковыль',         3800,'dried',  'new',    8],
+  ]) {
+    await q(`INSERT INTO products (id,name,"desc",price,category,badge,active,sort)
+             VALUES ($1,$2,$3,$4,$5,$6,TRUE,$7) ON CONFLICT DO NOTHING`,[id,name,desc,price,category,badge,sort]);
+  }
 
-  // Admin user
   const hash = bcrypt.hashSync('admin', 10);
-  db.prepare('INSERT OR IGNORE INTO users (id, name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)')
-    .run('admin001', 'Администратор', 'admin@velours.ru', '+7 495 000-00-00', hash, 'admin');
+  await q(`INSERT INTO users (id,name,email,phone,password_hash,role)
+           VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+    ['admin001','Администратор','admin@velours.ru','+7 495 000-00-00',hash,'admin']);
 
-  // Default settings
-  const setSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
-  [
-    ['shop_name',            'Velours'],
-    ['phone',                '+7 (495) 123-45-67'],
-    ['email',                'hello@velours.ru'],
-    ['city',                 'Москва'],
-    ['address',              'ул. Тверская, 12'],
-    ['delivery_price',       '500'],
-    ['free_from',            '3000'],
-    ['min_lead_hours',       '2'],
-    ['delivery_24_7',        'true'],
-    ['yookassa_shop_id',     ''],
-    ['yookassa_return_url',  '/pages/checkout.html?status=success'],
-    ['notify_email',         'true'],
-    ['notify_sms',           'false'],
-    ['notify_telegram',      'false'],
-    ['daily_report',         'true'],
-  ].forEach(([k, v]) => setSetting.run(k, v));
-
+  for (const [k,v] of [
+    ['shop_name','Velours'],['phone','+7 (495) 123-45-67'],['email','hello@velours.ru'],
+    ['city','Москва'],['address','ул. Тверская, 12'],['delivery_price','500'],
+    ['free_from','3000'],['min_lead_hours','2'],['delivery_24_7','true'],
+    ['yookassa_shop_id',''],['yookassa_return_url','/pages/checkout.html?status=success'],
+    ['notify_email','true'],['notify_sms','false'],['notify_telegram','false'],['daily_report','true'],
+  ]) {
+    await q('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT DO NOTHING',[k,v]);
+  }
   console.log('✅ Database seeded');
 }
 
-seed();
-
 // ─── CATEGORIES ─────────────────────────────────────────────
 const categories = {
-  getAll: () => db.prepare('SELECT * FROM categories ORDER BY sort, name').all(),
-  get: id => db.prepare('SELECT * FROM categories WHERE id = ?').get(id),
-  create: ({ id, name, icon = '', sort }) => {
-    const sortVal = sort ?? (db.prepare('SELECT MAX(sort) as m FROM categories').get().m || 0) + 1;
-    db.prepare('INSERT INTO categories (id, name, icon, sort) VALUES (?, ?, ?, ?)').run(id, name, icon, sortVal);
+  getAll: () => all('SELECT * FROM categories ORDER BY sort, name'),
+  get:    id => one('SELECT * FROM categories WHERE id = $1', [id]),
+  create: async ({ id, name, icon = '', sort }) => {
+    const m = await one('SELECT MAX(sort) AS m FROM categories');
+    const s = sort ?? (parseInt(m?.m || 0) + 1);
+    await q('INSERT INTO categories (id,name,icon,sort) VALUES ($1,$2,$3,$4)',[id,name,icon,s]);
     return categories.get(id);
   },
-  update: (id, data) => {
-    const fields = Object.entries(data).map(([k]) => `${k} = ?`).join(', ');
-    db.prepare(`UPDATE categories SET ${fields} WHERE id = ?`).run(...Object.values(data), id);
+  update: async (id, data) => {
+    const allowed = ['name','icon','sort'];
+    const sets = []; const vals = [];
+    for (const k of allowed) {
+      if (data[k] !== undefined) { vals.push(data[k]); sets.push(`${k} = $${vals.length}`); }
+    }
+    if (sets.length) { vals.push(id); await q(`UPDATE categories SET ${sets.join(',')} WHERE id = $${vals.length}`,vals); }
     return categories.get(id);
   },
-  delete: id => db.prepare('DELETE FROM categories WHERE id = ?').run(id),
+  delete: id => q('DELETE FROM categories WHERE id = $1',[id]),
 };
 
 // ─── PRODUCTS ───────────────────────────────────────────────
+const fmtProd = p => p ? { ...p, active: !!p.active, gallery: parseJSON(p.gallery) } : null;
+
 const products = {
-  getAll: ({ category, active, search } = {}) => {
-    let q = 'SELECT * FROM products WHERE 1=1';
+  getAll: async ({ category, active, search } = {}) => {
+    let text = 'SELECT * FROM products WHERE 1=1';
     const params = [];
-    if (category) { q += ' AND category = ?'; params.push(category); }
-    if (active !== undefined) { q += ' AND active = ?'; params.push(active ? 1 : 0); }
-    if (search) { q += ' AND (name LIKE ? OR desc LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
-    q += ' ORDER BY sort, created_at';
-    return db.prepare(q).all(...params).map(p => ({
-      ...p,
-      active: p.active === 1,
-      gallery: parseJSON(p.gallery),
-    }));
+    if (category !== undefined) { params.push(category); text += ` AND category = $${params.length}`; }
+    if (active !== undefined)   { params.push(active);   text += ` AND active = $${params.length}`; }
+    if (search) {
+      params.push(`%${search}%`);
+      const n = params.length;
+      text += ` AND (name ILIKE $${n} OR "desc" ILIKE $${n})`;
+    }
+    text += ' ORDER BY sort, created_at';
+    return (await all(text, params)).map(fmtProd);
   },
-  get: id => {
-    const p = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-    if (!p) return null;
-    return { ...p, active: p.active === 1, gallery: parseJSON(p.gallery) };
-  },
-  create: data => {
+  get: async id => fmtProd(await one('SELECT * FROM products WHERE id = $1',[id])),
+  create: async data => {
     const id = uid();
-    const sort = (db.prepare('SELECT MAX(sort) as m FROM products').get().m || 0) + 1;
-    db.prepare(`
-      INSERT INTO products (id, name, desc, price, old_price, category, badge, active, image, gallery, width, height, sort)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, data.name, data.desc||'', data.price, data.oldPrice||null, data.category||null,
-      data.badge||null, data.active !== false ? 1 : 0, data.image||null,
-      JSON.stringify(data.gallery||[]), data.width||null, data.height||null, sort);
+    const m  = await one('SELECT MAX(sort) AS m FROM products');
+    const sort = parseInt(m?.m || 0) + 1;
+    await q(
+      `INSERT INTO products (id,name,"desc",price,old_price,category,badge,active,image,gallery,width,height,sort)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id,data.name,data.desc||'',data.price,data.oldPrice||null,data.category||null,
+       data.badge||null,data.active!==false,data.image||null,
+       JSON.stringify(data.gallery||[]),data.width||null,data.height||null,sort]
+    );
     return products.get(id);
   },
-  update: (id, data) => {
-    const map = { name:'name', desc:'desc', price:'price', oldPrice:'old_price', category:'category',
-      badge:'badge', active:'active', image:'image', gallery:'gallery', width:'width', height:'height', sort:'sort' };
+  update: async (id, data) => {
+    const map = {name:'name',desc:'"desc"',price:'price',oldPrice:'old_price',category:'category',
+      badge:'badge',active:'active',image:'image',gallery:'gallery',width:'width',height:'height',sort:'sort'};
     const sets = []; const vals = [];
     for (const [k, col] of Object.entries(map)) {
       if (data[k] !== undefined) {
-        sets.push(`${col} = ?`);
         let v = data[k];
-        if (k === 'active') v = v ? 1 : 0;
+        if (k === 'active')  v = !!v;
         if (k === 'gallery') v = JSON.stringify(v);
-        vals.push(v);
+        vals.push(v); sets.push(`${col} = $${vals.length}`);
       }
     }
     if (!sets.length) return products.get(id);
-    sets.push('updated_at = ?'); vals.push(now());
-    db.prepare(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+    vals.push(now()); sets.push(`updated_at = $${vals.length}`);
+    vals.push(id);
+    await q(`UPDATE products SET ${sets.join(',')} WHERE id = $${vals.length}`,vals);
     return products.get(id);
   },
-  delete: id => db.prepare('DELETE FROM products WHERE id = ?').run(id),
+  delete: id => q('DELETE FROM products WHERE id = $1',[id]),
 };
 
 // ─── USERS ──────────────────────────────────────────────────
+const fmtUser = u => {
+  if (!u) return null;
+  const out = { ...u, addresses: parseJSON(u.addresses), favorites: parseJSON(u.favorites) };
+  delete out.password_hash;
+  return out;
+};
+
 const users = {
-  getAll: () => db.prepare('SELECT * FROM users ORDER BY created_at DESC').all().map(formatUser),
-  get: id => { const u = db.prepare('SELECT * FROM users WHERE id = ?').get(id); return u ? formatUser(u) : null; },
-  findByEmail: email => { const u = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email); return u ? formatUser(u) : null; },
-  findByEmailWithHash: email => db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email) || null,
-  getWithHash: id => db.prepare('SELECT * FROM users WHERE id = ?').get(id) || null,
-  create: data => {
-    const id = uid();
+  getAll: async () => (await all('SELECT * FROM users ORDER BY created_at DESC')).map(fmtUser),
+  get:    async id    => fmtUser(await one('SELECT * FROM users WHERE id = $1',[id])),
+  findByEmail: async email => fmtUser(await one('SELECT * FROM users WHERE LOWER(email) = LOWER($1)',[email])),
+  findByEmailWithHash: email => one('SELECT * FROM users WHERE LOWER(email) = LOWER($1)',[email]),
+  getWithHash:        id    => one('SELECT * FROM users WHERE id = $1',[id]),
+  create: async data => {
+    const id   = uid();
     const hash = bcrypt.hashSync(data.password, 10);
-    db.prepare('INSERT INTO users (id, name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, data.name, data.email, data.phone||null, hash, data.role||'customer');
+    await q('INSERT INTO users (id,name,email,phone,password_hash,role) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id,data.name,data.email,data.phone||null,hash,data.role||'customer']);
     return users.get(id);
   },
-  update: (id, data) => {
-    const map = { name:'name', email:'email', phone:'phone', birthday:'birthday', addresses:'addresses', favorites:'favorites' };
+  update: async (id, data) => {
+    const map = {name:'name',email:'email',phone:'phone',birthday:'birthday',addresses:'addresses',favorites:'favorites'};
     const sets = []; const vals = [];
-    for (const [k, col] of Object.entries(map)) {
+    for (const [k,col] of Object.entries(map)) {
       if (data[k] !== undefined) {
-        sets.push(`${col} = ?`);
         vals.push(Array.isArray(data[k]) ? JSON.stringify(data[k]) : data[k]);
+        sets.push(`${col} = $${vals.length}`);
       }
     }
-    if (data.password) { sets.push('password_hash = ?'); vals.push(bcrypt.hashSync(data.password, 10)); }
+    if (data.password) { vals.push(bcrypt.hashSync(data.password,10)); sets.push(`password_hash = $${vals.length}`); }
     if (!sets.length) return users.get(id);
-    db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+    vals.push(id);
+    await q(`UPDATE users SET ${sets.join(',')} WHERE id = $${vals.length}`,vals);
     return users.get(id);
   },
-  delete: id => db.prepare('DELETE FROM users WHERE id = ?').run(id),
-  verifyPassword: (user, password) => bcrypt.compareSync(password, user.password_hash || user.passwordHash),
+  delete: id => q('DELETE FROM users WHERE id = $1',[id]),
+  verifyPassword: (user, password) => bcrypt.compareSync(password, user.password_hash),
 };
-
-function formatUser(u) {
-  return {
-    ...u,
-    passwordHash: undefined,
-    password_hash: undefined,
-    addresses: parseJSON(u.addresses),
-    favorites: parseJSON(u.favorites),
-  };
-}
 
 // ─── ORDERS ─────────────────────────────────────────────────
+const fmtOrder = o => o ? {
+  ...o, items: parseJSON(o.items),
+  userId: o.user_id, customerName: o.customer_name,
+  recipientName: o.recipient_name, recipientPhone: o.recipient_phone,
+  cardText: o.card_text, deliveryDate: o.delivery_date, deliveryTime: o.delivery_time,
+  deliveryType: o.delivery_type, deliveryCost: o.delivery_cost,
+  paymentStatus: o.payment_status, paymentId: o.payment_id,
+  paymentMethod: o.payment_method, createdAt: o.created_at,
+} : null;
+
 const orders = {
-  getAll: ({ userId, status, search, limit } = {}) => {
-    let q = 'SELECT * FROM orders WHERE 1=1';
+  getAll: async ({ userId, status, search, limit } = {}) => {
+    let text = 'SELECT * FROM orders WHERE 1=1';
     const params = [];
-    if (userId) { q += ' AND user_id = ?'; params.push(userId); }
-    if (status) { q += ' AND status = ?'; params.push(status); }
-    if (search) { q += ' AND (id LIKE ? OR customer_name LIKE ? OR phone LIKE ?)'; params.push(`%${search}%`,`%${search}%`,`%${search}%`); }
-    q += ' ORDER BY created_at DESC';
-    if (limit) { q += ' LIMIT ?'; params.push(limit); }
-    return db.prepare(q).all(...params).map(formatOrder);
+    if (userId) { params.push(userId); text += ` AND user_id = $${params.length}`; }
+    if (status) { params.push(status); text += ` AND status = $${params.length}`; }
+    if (search) {
+      params.push(`%${search}%`);
+      const n = params.length;
+      text += ` AND (id ILIKE $${n} OR customer_name ILIKE $${n} OR phone ILIKE $${n})`;
+    }
+    text += ' ORDER BY created_at DESC';
+    if (limit) { params.push(limit); text += ` LIMIT $${params.length}`; }
+    return (await all(text, params)).map(fmtOrder);
   },
-  get: id => { const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(id); return o ? formatOrder(o) : null; },
-  create: data => {
-    const count = db.prepare('SELECT COUNT(*) as c FROM orders').get().c;
-    const id = 'ORD-' + String(count + 1).padStart(3, '0');
-    db.prepare(`
-      INSERT INTO orders (id, user_id, customer_name, phone, email, recipient_name, recipient_phone,
-        card_text, address, delivery_date, delivery_time, delivery_type, delivery_cost,
-        note, items, subtotal, discount, total, payment_method)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, data.userId||null, data.customerName, data.phone||null, data.email||null,
-      data.recipientName||null, data.recipientPhone||null, data.cardText||null,
-      data.address||null, data.deliveryDate||null, data.deliveryTime||null,
-      data.deliveryType||'courier', data.deliveryCost||0, data.note||null,
-      JSON.stringify(data.items||[]), data.subtotal||0, data.discount||0, data.total,
-      data.paymentMethod||null);
+  get:    async id => fmtOrder(await one('SELECT * FROM orders WHERE id = $1',[id])),
+  create: async data => {
+    const countRow = await one('SELECT COUNT(*) AS c FROM orders');
+    const id = 'ORD-' + String(parseInt(countRow.c) + 1).padStart(3,'0');
+    await q(
+      `INSERT INTO orders (id,user_id,customer_name,phone,email,recipient_name,recipient_phone,
+        card_text,address,delivery_date,delivery_time,delivery_type,delivery_cost,
+        note,items,subtotal,discount,total,payment_method)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+      [id,data.userId||null,data.customerName,data.phone||null,data.email||null,
+       data.recipientName||null,data.recipientPhone||null,data.cardText||null,
+       data.address||null,data.deliveryDate||null,data.deliveryTime||null,
+       data.deliveryType||'courier',data.deliveryCost||0,data.note||null,
+       JSON.stringify(data.items||[]),data.subtotal||0,data.discount||0,data.total,
+       data.paymentMethod||null]
+    );
     return orders.get(id);
   },
-  update: (id, data) => {
-    const map = { status:'status', paymentStatus:'payment_status', paymentId:'payment_id',
-      customerName:'customer_name', phone:'phone', address:'address', note:'note' };
+  update: async (id, data) => {
+    const map = {status:'status',paymentStatus:'payment_status',paymentId:'payment_id',
+      customerName:'customer_name',phone:'phone',address:'address',note:'note'};
     const sets = []; const vals = [];
-    for (const [k, col] of Object.entries(map)) {
-      if (data[k] !== undefined) { sets.push(`${col} = ?`); vals.push(data[k]); }
+    for (const [k,col] of Object.entries(map)) {
+      if (data[k] !== undefined) { vals.push(data[k]); sets.push(`${col} = $${vals.length}`); }
     }
     if (!sets.length) return orders.get(id);
-    sets.push('updated_at = ?'); vals.push(now());
-    db.prepare(`UPDATE orders SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+    vals.push(now()); sets.push(`updated_at = $${vals.length}`);
+    vals.push(id);
+    await q(`UPDATE orders SET ${sets.join(',')} WHERE id = $${vals.length}`,vals);
     return orders.get(id);
   },
-  delete: id => db.prepare('DELETE FROM orders WHERE id = ?').run(id),
-  stats: () => {
-    const total = db.prepare('SELECT COUNT(*) as c FROM orders').get().c;
-    const today = new Date().toISOString().split('T')[0];
-    const todayTs = new Date(today).getTime();
-    const todayCount = db.prepare('SELECT COUNT(*) as c FROM orders WHERE created_at >= ?').get(todayTs).c;
-    const todayRev = db.prepare(`SELECT COALESCE(SUM(total),0) as s FROM orders WHERE created_at >= ? AND payment_status = 'paid'`).get(todayTs).s;
-    const byStatus = db.prepare('SELECT status, COUNT(*) as c FROM orders GROUP BY status').all()
-      .reduce((acc, r) => ({ ...acc, [r.status]: r.c }), {});
-    return { total, todayCount, todayRevenue: todayRev, byStatus };
+  delete: id => q('DELETE FROM orders WHERE id = $1',[id]),
+  stats: async () => {
+    const todayTs = new Date().setHours(0,0,0,0);
+    const [tot, tday, trev, byS] = await Promise.all([
+      one('SELECT COUNT(*) AS c FROM orders'),
+      one('SELECT COUNT(*) AS c FROM orders WHERE created_at >= $1',[todayTs]),
+      one(`SELECT COALESCE(SUM(total),0) AS s FROM orders WHERE created_at >= $1 AND payment_status = 'paid'`,[todayTs]),
+      all('SELECT status, COUNT(*) AS c FROM orders GROUP BY status'),
+    ]);
+    return {
+      total:        parseInt(tot.c),
+      todayCount:   parseInt(tday.c),
+      todayRevenue: parseInt(trev.s),
+      byStatus:     byS.reduce((acc,r) => ({...acc,[r.status]:parseInt(r.c)}),{}),
+    };
   },
 };
-
-function formatOrder(o) {
-  return { ...o, items: parseJSON(o.items), userId: o.user_id,
-    customerName: o.customer_name, recipientName: o.recipient_name, recipientPhone: o.recipient_phone,
-    cardText: o.card_text, deliveryDate: o.delivery_date, deliveryTime: o.delivery_time,
-    deliveryType: o.delivery_type, deliveryCost: o.delivery_cost, paymentStatus: o.payment_status,
-    paymentId: o.payment_id, paymentMethod: o.payment_method, createdAt: o.created_at };
-}
 
 // ─── SETTINGS ───────────────────────────────────────────────
 const settings = {
-  get: () => {
-    const rows = db.prepare('SELECT key, value FROM settings').all();
-    return Object.fromEntries(rows.map(r => [r.key, r.value]));
-  },
-  set: (key, value) => db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, String(value)),
-  update: data => {
-    const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-    const tx = db.transaction(entries => entries.forEach(([k, v]) => upsert.run(k, String(v))));
-    tx(Object.entries(data));
+  get: async () => Object.fromEntries((await all('SELECT key,value FROM settings')).map(r => [r.key,r.value])),
+  set: (key, value) => q(
+    'INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+    [key, String(value)]
+  ),
+  update: async data => {
+    for (const [k,v] of Object.entries(data)) {
+      await q('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',[k,String(v)]);
+    }
     return settings.get();
   },
 };
 
-module.exports = { db, categories, products, users, orders, settings };
+// ─── INIT ────────────────────────────────────────────────────
+async function init() {
+  try {
+    await initSchema();
+    await seed();
+    console.log('✅ PostgreSQL connected and ready');
+  } catch (err) {
+    console.error('❌ Database init failed:', err.message);
+    process.exit(1);
+  }
+}
+
+module.exports = { pool, categories, products, users, orders, settings, init };

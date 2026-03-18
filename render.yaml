@@ -1,3 +1,9 @@
+databases:
+  - name: velours-db
+    plan: free
+    databaseName: velours_db
+    user: velours_user
+
 services:
   - type: web
     name: velours
@@ -12,3 +18,7 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: velours-db
+          property: connectionString
