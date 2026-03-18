@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Velours — Доставка цветов в Москве</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-follower" id="cursor-follower"></div>
+<div class="loader" id="loader"><div class="loader-inner"><div class="loader-logo">Velours</div><div class="loader-line"><span></span></div></div></div>
+
+<nav class="nav" id="mainNav">
+  <div class="nav-left">
+    <a href="#catalog" class="nav-link">Каталог</a>
+    <a href="#how" class="nav-link">Доставка</a>
+    <a href="#occasions" class="nav-link">Поводы</a>
+  </div>
+  <a href="/" class="nav-logo">Velours</a>
+  <div class="nav-right">
+    <!-- Favorites button -->
+    <a href="/pages/cabinet.html#favorites" class="nav-cart-btn nav-fav-btn" id="navFavBtn" title="Избранное">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M8.5 14.5S1.5 10 1.5 5.5a4 4 0 017-2.63A4 4 0 0115.5 5.5c0 4.5-7 9-7 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span class="fav-badge" id="favBadge" style="display:none">0</span>
+    </a>
+    <!-- Cart button -->
+    <button class="nav-cart-btn" data-open-cart aria-label="Корзина">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 1h2l2.4 7.39a2 2 0 001.9 1.41h6.18a2 2 0 001.9-1.38L17 4H4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="16" r="1" fill="currentColor"/><circle cx="13" cy="16" r="1" fill="currentColor"/></svg>
+      <span class="cart-badge">0</span>
+    </button>
+    <a href="/pages/cabinet.html" class="nav-user-btn" id="navUserBtn" style="display:none">
+      <div class="nav-user-avatar" id="navUserAvatar">А</div>
+      <span id="navUserName">Кабинет</span>
+    </a>
+    <a href="/pages/auth.html" class="nav-cta" id="navLoginBtn">Войти</a>
+    <button class="nav-burger" id="burgerBtn"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<div class="mobile-menu" id="mobileMenu">
+  <button id="menuClose" style="position:absolute;top:24px;right:24px;background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer">✕</button>
+  <div class="mobile-menu-inner">
+    <a href="#catalog" class="mobile-link">Каталог</a>
+    <a href="#how" class="mobile-link">Доставка</a>
+    <a href="#occasions" class="mobile-link">Поводы</a>
+    <a href="/pages/auth.html" class="mobile-link mobile-link--cta">Войти</a>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="hero-bg"><div class="hero-blob hero-blob--1"></div><div class="hero-blob hero-blob--2"></div><div class="hero-blob hero-blob--3"></div></div>
+
+  <!-- Floral decorations left -->
+  <svg class="hero-floral hero-floral--left" viewBox="0 0 200 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M40 580 Q20 400 80 300 Q140 200 60 80" stroke="#2a7a4a" stroke-width="2" fill="none" opacity="0.6"/>
+    <ellipse cx="95" cy="160" rx="38" ry="22" fill="#2a7a4a" opacity="0.25" transform="rotate(-30 95 160)"/>
+    <ellipse cx="55" cy="240" rx="32" ry="18" fill="#3d9a5d" opacity="0.2" transform="rotate(20 55 240)"/>
+    <ellipse cx="110" cy="310" rx="42" ry="20" fill="#2a7a4a" opacity="0.22" transform="rotate(-15 110 310)"/>
+    <ellipse cx="48" cy="390" rx="30" ry="16" fill="#3d9a5d" opacity="0.18" transform="rotate(25 48 390)"/>
+    <ellipse cx="100" cy="460" rx="36" ry="19" fill="#2a7a4a" opacity="0.2" transform="rotate(-10 100 460)"/>
+    <!-- Flower buds -->
+    <circle cx="68" cy="95" r="8" fill="#c9a96e" opacity="0.4"/>
+    <circle cx="72" cy="83" r="5" fill="#dfc48e" opacity="0.35"/>
+    <circle cx="120" cy="200" r="7" fill="#e8c5b5" opacity="0.35"/>
+    <circle cx="85" cy="350" r="6" fill="#c9a96e" opacity="0.3"/>
+  </svg>
+
+  <!-- Floral decorations right -->
+  <svg class="hero-floral hero-floral--right" viewBox="0 0 200 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M40 580 Q20 400 80 300 Q140 200 60 80" stroke="#2a7a4a" stroke-width="2" fill="none" opacity="0.6"/>
+    <ellipse cx="95" cy="160" rx="38" ry="22" fill="#2a7a4a" opacity="0.25" transform="rotate(-30 95 160)"/>
+    <ellipse cx="55" cy="240" rx="32" ry="18" fill="#3d9a5d" opacity="0.2" transform="rotate(20 55 240)"/>
+    <ellipse cx="110" cy="310" rx="42" ry="20" fill="#2a7a4a" opacity="0.22" transform="rotate(-15 110 310)"/>
+    <ellipse cx="48" cy="390" rx="30" ry="16" fill="#3d9a5d" opacity="0.18" transform="rotate(25 48 390)"/>
+    <ellipse cx="100" cy="460" rx="36" ry="19" fill="#2a7a4a" opacity="0.2" transform="rotate(-10 100 460)"/>
+    <circle cx="68" cy="95" r="8" fill="#c9a96e" opacity="0.4"/>
+    <circle cx="72" cy="83" r="5" fill="#dfc48e" opacity="0.35"/>
+    <circle cx="120" cy="200" r="7" fill="#e8c5b5" opacity="0.35"/>
+    <circle cx="85" cy="350" r="6" fill="#c9a96e" opacity="0.3"/>
+  </svg>
+  <div class="hero-content">
+    <div class="hero-eyebrow reveal">Авторские букеты в Москве</div>
+    <h1 class="hero-title reveal" data-delay="100">Цветы, которые<br><em>говорят</em> больше<br>слов</h1>
+    <p class="hero-subtitle reveal" data-delay="150">Бархатные розы, редкие пионы, экзотические орхидеи — каждый букет создаётся флористом с душой и доставляется в любую точку города</p>
+    <div class="hero-actions reveal" data-delay="200">
+      <a href="#catalog" class="btn btn--primary">Выбрать букет</a>
+      <a href="#order" class="btn btn--ghost">Оставить заявку</a>
+    </div>
+    <div class="hero-stats reveal" data-delay="250">
+      <div class="hero-stat"><span class="hero-stat__number" data-counter data-target="4800">0</span><span class="hero-stat__suffix">+</span><span class="hero-stat__label">букетов доставлено</span></div>
+      <div class="hero-stat-divider"></div>
+      <div class="hero-stat"><span class="hero-stat__number" data-counter data-target="98">0</span><span class="hero-stat__suffix">%</span><span class="hero-stat__label">довольных клиентов</span></div>
+      <div class="hero-stat-divider"></div>
+      <div class="hero-stat"><span class="hero-stat__number" data-counter data-target="2">0</span><span class="hero-stat__suffix">ч</span><span class="hero-stat__label">экспресс-доставка</span></div>
+    </div>
+  </div>
+  <div class="hero-scroll"><span>Листать</span><div class="hero-scroll-line"></div></div>
+</section>
+
+<div class="marquee-wrap"><div class="marquee-track"><span>Пионовидные Розы</span><span class="marquee-dot">·</span><span>Белые Пионы</span><span class="marquee-dot">·</span><span>Лавандовые Тюльпаны</span><span class="marquee-dot">·</span><span>Эустома</span><span class="marquee-dot">·</span><span>Ранункулюс</span><span class="marquee-dot">·</span><span>Делфиниум</span><span class="marquee-dot">·</span><span>Мимоза</span><span class="marquee-dot">·</span><span>Агапантус</span><span class="marquee-dot">·</span><span>Пионовидные Розы</span><span class="marquee-dot">·</span><span>Белые Пионы</span><span class="marquee-dot">·</span><span>Лавандовые Тюльпаны</span><span class="marquee-dot">·</span><span>Эустома</span><span class="marquee-dot">·</span><span>Ранункулюс</span><span class="marquee-dot">·</span><span>Делфиниум</span><span class="marquee-dot">·</span><span>Мимоза</span><span class="marquee-dot">·</span><span>Агапантус</span><span class="marquee-dot">·</span></div></div>
+
+<section class="why" id="why">
+  <div class="container">
+    <div class="why-header reveal"><div class="section-eyebrow">Почему Velours</div><h2 class="section-title">Сервис, который <em>превосходит</em> ожидания</h2></div>
+    <div class="why-grid">
+      <div class="why-card reveal" data-delay="100"><div class="why-card__icon"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4L5 10v14h18V10L14 4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 24V16h8v8" stroke="currentColor" stroke-width="1.5"/></svg></div><h3 class="why-card__title">Авторский дизайн</h3><p class="why-card__text">Каждый букет — уникальная флористическая композиция, созданная по вашему пожеланию или вкусу мастера</p></div>
+      <div class="why-card reveal" data-delay="150"><div class="why-card__icon"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M14 8v6l4 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div><h3 class="why-card__title">Доставка за 2 часа</h3><p class="why-card__text">Экспресс-доставка по Москве. Точное время, свежие цветы и бережная упаковка — гарантированно</p></div>
+      <div class="why-card reveal" data-delay="200"><div class="why-card__icon"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4C9.58 4 6 7.58 6 12c0 7 8 14 8 14s8-7 8-14c0-4.42-3.58-8-8-8z" stroke="currentColor" stroke-width="1.5"/><circle cx="14" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/></svg></div><h3 class="why-card__title">Свежесть из первых рук</h3><p class="why-card__text">Прямые поставки с голландских и эквадорских ферм. Цветы прибывают дважды в неделю</p></div>
+      <div class="why-card reveal" data-delay="250"><div class="why-card__icon"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4l2.9 6.26L24 11.27l-5 5.14 1.18 7.09L14 20.1l-6.18 3.4L9 16.41 4 11.27l7.1-1.01L14 4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div><h3 class="why-card__title">Премиальная упаковка</h3><p class="why-card__text">Крафтовые коробки, шёлковые ленты, персональная открытка — каждая деталь продумана</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog" id="catalog">
+  <div class="container">
+    <div class="catalog-header reveal">
+      <div class="section-eyebrow">Наши работы</div>
+      <h2 class="section-title">Коллекция <em>букетов</em></h2>
+      <p class="section-sub">Авторские букеты на любой повод и вкус</p>
+      <div class="catalog-filters" id="catalogFilters"></div>
+    </div>
+    <div class="catalog-grid" id="catalogGrid"></div>
+    <div class="catalog-more reveal"><a href="/pages/checkout.html" class="btn btn--outline">Оформить заказ →</a></div>
+  </div>
+</section>
+
+<section class="process" id="how">
+  <div class="process-bg"></div>
+  <div class="container">
+    <div class="process-header reveal"><div class="section-eyebrow">Как это работает</div><h2 class="section-title">Четыре шага до <em>счастья</em></h2></div>
+    <div class="process-steps">
+      <div class="process-step reveal" data-delay="100"><div class="process-step__num">01</div><div class="process-step__arrow">→</div><h3 class="process-step__title">Выберите букет</h3><p class="process-step__text">Каталог с фильтрами по цвету, поводу, бюджету</p></div>
+      <div class="process-step reveal" data-delay="150"><div class="process-step__num">02</div><div class="process-step__arrow">→</div><h3 class="process-step__title">Оформите заказ</h3><p class="process-step__text">Укажите адрес и время. Оплатите онлайн или наличными</p></div>
+      <div class="process-step reveal" data-delay="200"><div class="process-step__num">03</div><div class="process-step__arrow">→</div><h3 class="process-step__title">Флорист собирает</h3><p class="process-step__text">Мастер бережно составляет букет из свежесрезанных цветов</p></div>
+      <div class="process-step reveal" data-delay="250"><div class="process-step__num">04</div><div class="process-step__arrow">✓</div><h3 class="process-step__title">Доставка</h3><p class="process-step__text">Курьер доставит точно в срок. SMS за час до прибытия</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="occasions" id="occasions">
+  <div class="container">
+    <div class="occasions-header reveal"><div class="section-eyebrow">Поводы для букета</div><h2 class="section-title">Цветы <em>уместны</em> всегда</h2></div>
+    <div class="occasions-grid">
+      <div class="occasion-card reveal" data-delay="100"><div class="occasion-card__icon">💍</div><h3>Свадьба</h3><p>Свадебные букеты и оформление</p></div>
+      <div class="occasion-card reveal" data-delay="130"><div class="occasion-card__icon">🎂</div><h3>День рождения</h3><p>Яркие и нежные букеты-сюрпризы</p></div>
+      <div class="occasion-card reveal" data-delay="160"><div class="occasion-card__icon">💝</div><h3>Признание</h3><p>Романтические букеты с посланием</p></div>
+      <div class="occasion-card reveal" data-delay="190"><div class="occasion-card__icon">🎓</div><h3>Выпускной</h3><p>Торжественные букеты для дипломников</p></div>
+      <div class="occasion-card reveal" data-delay="220"><div class="occasion-card__icon">🏠</div><h3>Новоселье</h3><p>Уютные букеты для нового дома</p></div>
+      <div class="occasion-card reveal" data-delay="250"><div class="occasion-card__icon">🌸</div><h3>Просто так</h3><p>Потому что вы думаете о ком-то</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="reviews" id="reviews">
+  <div class="container">
+    <div class="reviews-header reveal"><div class="section-eyebrow">Отзывы</div><h2 class="section-title">Что говорят наши <em>клиенты</em></h2></div>
+    <div class="reviews-slider reveal">
+      <div class="review-card active"><div class="review-card__stars">★★★★★</div><p class="review-card__text">"Заказала пионы на годовщину — букет был настолько красив, что муж решил, что я сама флорист. Доставили строго в 14:00!"</p><div class="review-card__author"><div class="review-card__avatar">А</div><div><strong>Анастасия Морозова</strong><span>Клиент с 2022 года</span></div></div></div>
+      <div class="review-card"><div class="review-card__stars">★★★★★</div><p class="review-card__text">"Заказывал для сюрприза — передал только «жёлтое настроение». Флорист создал невероятный букет из мимозы и ранункулюсов!"</p><div class="review-card__author"><div class="review-card__avatar">М</div><div><strong>Михаил Родионов</strong><span>Постоянный клиент</span></div></div></div>
+      <div class="review-card"><div class="review-card__stars">★★★★★</div><p class="review-card__text">"Velours — мои любимые цветы. Коробка, лента, открытка — всё как в лучшем бутике. А цветы стоят дольше, чем в магазинах!"</p><div class="review-card__author"><div class="review-card__avatar">С</div><div><strong>София Лебедева</strong><span>12 заказов</span></div></div></div>
+    </div>
+    <div class="reviews-nav"><button class="reviews-prev">←</button><div class="reviews-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div><button class="reviews-next">→</button></div>
+  </div>
+</section>
+
+<section class="order-section" id="order">
+  <div class="container">
+    <div class="order-grid">
+      <div class="reveal">
+        <div class="section-eyebrow">Заказать букет</div>
+        <h2 class="section-title">Свяжитесь <em>с нами</em></h2>
+        <p class="order-text">Оставьте заявку — флорист перезвонит в течение 15 минут, уточнит детали и поможет с выбором</p>
+        <div class="order-contacts">
+          <a href="tel:+74951234567" class="order-contact-link">+7 (495) 123-45-67</a>
+          <a href="mailto:hello@velours.ru" class="order-contact-link">hello@velours.ru</a>
+        </div>
+        <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
+          <a href="/pages/checkout.html" class="btn btn--primary">Оформить заказ</a>
+          <a href="#catalog" class="btn btn--outline">Смотреть каталог</a>
+        </div>
+      </div>
+      <form class="order-form reveal" data-delay="150" id="mainOrderForm">
+        <h3 style="font-family:var(--font-display);font-size:1.5rem;font-weight:300;color:var(--cream);margin-bottom:20px">Быстрая заявка</h3>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Ваше имя</label><input type="text" class="form-input" id="oName" placeholder="Анна" required/></div>
+          <div class="form-group"><label class="form-label">Телефон</label><input type="tel" class="form-input" id="oPhone" placeholder="+7 (___) ___-__-__" required/></div>
+        </div>
+        <div class="form-group"><label class="form-label">Адрес доставки</label><input type="text" class="form-input" id="oAddress" placeholder="Улица, дом, квартира"/></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Дата</label><input type="date" class="form-input" id="oDate"/></div>
+          <div class="form-group"><label class="form-label">Время</label><select class="form-input" id="oTime"><option value="">Выберите</option><option>09:00–11:00</option><option>11:00–13:00</option><option>13:00–15:00</option><option>15:00–17:00</option><option>17:00–19:00</option><option>19:00–21:00</option></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">Пожелания</label><textarea class="form-input form-textarea" id="oNote" placeholder="Состав, поздравление..."></textarea></div>
+        <label class="form-check" style="margin-bottom:16px"><input type="checkbox" required/> Согласен с <a href="#" style="color:var(--gold)">условиями</a></label>
+        <button type="submit" class="btn btn--primary btn--full">Отправить заявку</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-top"><div class="container"><div class="footer-grid">
+    <div><div class="footer-logo">Velours</div><p class="footer-tagline">Авторская доставка цветов в Москве. Бережно. Красиво. Вовремя.</p><div class="footer-social"><a href="#" class="social-link">VK</a><a href="#" class="social-link">TG</a><a href="#" class="social-link">IG</a><a href="#" class="social-link">WA</a></div></div>
+    <div><div class="footer-col__title">Категории</div><ul class="footer-links" id="footerCatLinks"><li><a href="#catalog">Все букеты</a></li></ul></div>
+    <div><div class="footer-col__title">Покупателям</div><ul class="footer-links"><li><a href="/pages/checkout.html">Оформить заказ</a></li><li><a href="/pages/cabinet.html">Личный кабинет</a></li><li><a href="#">Доставка и оплата</a></li></ul></div>
+    <div><div class="footer-col__title">Контакты</div><ul class="footer-links"><li>+7 (495) 123-45-67</li><li>hello@velours.ru</li><li>ул. Тверская, 12</li><li>Пн–Вс: 8:00–23:00</li></ul></div>
+  </div></div></div>
+  <div class="footer-bottom"><div class="container"><span>© 2024 Velours</span><div style="display:flex;gap:20px"><a href="#">Политика</a><a href="/admin/" style="color:var(--border);font-size:.7rem">Admin ↗</a></div></div></div>
+</footer>
+
+<div class="modal-overlay" id="quickModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('quickModal').classList.remove('open');document.body.style.overflow=''">✕</button>
+    <h2 class="modal-title">Быстрый заказ</h2>
+    <div class="modal-product" id="quickModalProduct"></div>
+    <form class="modal-form" id="quickOrderForm">
+      <div class="form-group"><label class="form-label">Имя *</label><input type="text" class="form-input" id="qName" placeholder="Ваше имя" required/></div>
+      <div class="form-group"><label class="form-label">Телефон *</label><input type="tel" class="form-input" id="qPhone" placeholder="+7" required/></div>
+      <button type="submit" class="btn btn--primary btn--full" style="margin-top:8px">Перезвоните мне</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/api.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  CartWidget.init();
+  const sess = DB.session.get();
+
+  // ── Auth nav ──
+  const navUserBtn = document.getElementById('navUserBtn');
+  const navLoginBtn = document.getElementById('navLoginBtn');
+  const navUserAvatar = document.getElementById('navUserAvatar');
+  const navUserName = document.getElementById('navUserName');
+  if (sess) {
+    if (navUserBtn)  { navUserBtn.style.display = 'flex'; navUserAvatar.textContent = (sess.name||'?')[0].toUpperCase(); navUserName.textContent = sess.name.split(' ')[0]; }
+    if (navLoginBtn) navLoginBtn.style.display = 'none';
+  } else {
+    if (navUserBtn)  navUserBtn.style.display = 'none';
+    if (navLoginBtn) navLoginBtn.style.display = '';
+  }
+
+  // ── Favorites badge ──
+  function updateFavBadge() {
+    const badge = document.getElementById('favBadge');
+    if (!badge) return;
+    if (sess) {
+      const u = DB.users.get(sess.userId);
+      const count = (u?.favorites || []).length;
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+  }
+  updateFavBadge();
+
+  // ── Catalog filters from DB ──
+  const grid = document.getElementById('catalogGrid');
+  const cats = DB.categories.getAll();
+  const filtersEl = document.getElementById('catalogFilters');
+  if (filtersEl && cats.length) {
+    filtersEl.innerHTML = '<button class="filter-btn active" data-filter="all">Все</button>' +
+      cats.map(c => '<button class="filter-btn" data-filter="' + c.id + '">' + (c.icon||'') + ' ' + c.name + '</button>').join('');
+    filtersEl.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const f = btn.dataset.filter;
+        document.querySelectorAll('.product-card').forEach(card => {
+          card.classList.toggle('hidden', f !== 'all' && card.dataset.category !== f);
+        });
+      });
+    });
+  }
+  if (grid) {
+    const products = DB.products.getAll({ active: true });
+    if (products.length) {
+      const badgeLabels = { hit: 'Хит', new: 'Новинка', premium: 'Премиум' };
+      grid.innerHTML = products.map(p => {
+        const imgHtml = p.image ? '<img src="' + p.image + '" alt="' + p.name + '" />' : '<div style="font-size:3rem;opacity:.3">🌹</div>';
+        const badge = p.badge ? '<span class="product-card__badge product-card__badge--' + p.badge + '">' + (badgeLabels[p.badge]||p.badge) + '</span>' : '';
+        return '<div class="product-card reveal" data-category="' + p.category + '"><div class="product-card__visual"><div class="product-card__img">' + imgHtml + '</div>' + badge + '<div class="product-card__actions"><button class="product-card__quick-btn" data-add-cart="' + p.id + '">В корзину</button><button class="product-card__fav-btn" onclick="toggleFav(\'' + p.id + '\', this)">♡</button></div></div><div class="product-card__info"><div class="product-card__name">' + p.name + '</div><div class="product-card__desc">' + (p.desc||'') + '</div><div class="product-card__footer"><div class="product-card__price">' + p.price.toLocaleString('ru') + ' ₽</div><button class="product-card__btn" data-add-cart="' + p.id + '">Добавить</button></div></div></div>';
+      }).join('');
+      const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+      }, { threshold: 0.1 });
+      grid.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+    }
+  }
+  const ul = document.getElementById('footerCatLinks');
+  if (ul) {
+    ul.innerHTML = '<li><a href="#catalog">Все букеты</a></li>';
+    cats.forEach(c => { const li = document.createElement('li'); li.innerHTML = '<a href="#catalog">' + (c.icon||'') + ' ' + c.name + '</a>'; ul.appendChild(li); });
+  }
+  window.toggleFav = function(id, btn) {
+    const s = DB.session.get();
+    if (!s) { window.location.href = 'pages/auth.html'; return; }
+    const u = DB.users.get(s.userId);
+    const favs = u.favorites || [];
+    if (favs.includes(id)) { DB.users.update(s.userId, { favorites: favs.filter(f => f !== id) }); btn.textContent = '♡'; btn.classList.remove('active'); }
+    else { DB.users.update(s.userId, { favorites: [...favs, id] }); btn.textContent = '♥'; btn.classList.add('active'); }
+  };
+  window.showToast = function(msg, type) {
+    const t = document.getElementById('toast'); if (!t) return;
+    t.textContent = msg; t.className = 'toast' + (type ? ' toast--'+type : '');
+    t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
+  };
+});
+</script>
+</body>
+</html>
