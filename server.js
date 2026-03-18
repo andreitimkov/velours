@@ -78,7 +78,7 @@ app.get('/api/health', (req, res) => ok(res, { status: 'ok', time: new Date().to
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return fail(res, 'Email и пароль обязательны');
-  const user = users.findByEmail(email);
+  const user = users.findByEmailWithHash(email);
   if (!user || !users.verifyPassword(user, password)) return fail(res, 'Неверный email или пароль', 401);
   const token = jwt.sign({ userId: user.id, role: user.role, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
   ok(res, { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
